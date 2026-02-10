@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark } from "lucide-react";
 
 const prayerTimes = [
   { name: "الفجر", time: "05:30", passed: true },
@@ -20,12 +22,56 @@ const quranTasks = [
   { id: "5", text: "قراءة سورة الكهف (الجمعة)", done: false },
 ];
 
-// Hijri month names
 const hijriMonths = ["محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
 const miladiMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
-// Simple Gregorian-to-Hijri approximation
+const suraList = [
+  { number: 1, name: "الفاتحة", startPage: 1 },
+  { number: 2, name: "البقرة", startPage: 2 },
+  { number: 3, name: "آل عمران", startPage: 50 },
+  { number: 4, name: "النساء", startPage: 77 },
+  { number: 5, name: "المائدة", startPage: 106 },
+  { number: 6, name: "الأنعام", startPage: 128 },
+  { number: 7, name: "الأعراف", startPage: 151 },
+  { number: 8, name: "الأنفال", startPage: 177 },
+  { number: 9, name: "التوبة", startPage: 187 },
+  { number: 10, name: "يونس", startPage: 208 },
+  { number: 11, name: "هود", startPage: 221 },
+  { number: 12, name: "يوسف", startPage: 235 },
+  { number: 13, name: "الرعد", startPage: 249 },
+  { number: 14, name: "إبراهيم", startPage: 255 },
+  { number: 15, name: "الحجر", startPage: 262 },
+  { number: 16, name: "النحل", startPage: 267 },
+  { number: 17, name: "الإسراء", startPage: 282 },
+  { number: 18, name: "الكهف", startPage: 293 },
+  { number: 19, name: "مريم", startPage: 305 },
+  { number: 20, name: "طه", startPage: 312 },
+  { number: 21, name: "الأنبياء", startPage: 322 },
+  { number: 22, name: "الحج", startPage: 332 },
+  { number: 23, name: "المؤمنون", startPage: 342 },
+  { number: 24, name: "النور", startPage: 350 },
+  { number: 25, name: "الفرقان", startPage: 359 },
+  { number: 26, name: "الشعراء", startPage: 367 },
+  { number: 27, name: "النمل", startPage: 377 },
+  { number: 28, name: "القصص", startPage: 385 },
+  { number: 29, name: "العنكبوت", startPage: 396 },
+  { number: 30, name: "الروم", startPage: 404 },
+  { number: 36, name: "يس", startPage: 440 },
+  { number: 55, name: "الرحمن", startPage: 531 },
+  { number: 56, name: "الواقعة", startPage: 534 },
+  { number: 67, name: "الملك", startPage: 562 },
+  { number: 78, name: "النبأ", startPage: 582 },
+  { number: 112, name: "الإخلاص", startPage: 604 },
+  { number: 113, name: "الفلق", startPage: 604 },
+  { number: 114, name: "الناس", startPage: 604 },
+];
+
+const sampleVerses: Record<number, { sura: string; verses: string[] }> = {
+  1: { sura: "الفاتحة", verses: ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ﴿١﴾", "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ﴿٢﴾", "الرَّحْمَٰنِ الرَّحِيمِ ﴿٣﴾", "مَالِكِ يَوْمِ الدِّينِ ﴿٤﴾", "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ﴿٥﴾", "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ﴿٦﴾", "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ ﴿٧﴾"] },
+  2: { sura: "البقرة", verses: ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الم ﴿١﴾", "ذَٰلِكَ الْكِتَابُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِلْمُتَّقِينَ ﴿٢﴾", "الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُقِيمُونَ الصَّلَاةَ وَمِمَّا رَزَقْنَاهُمْ يُنْفِقُونَ ﴿٣﴾"] },
+};
+
 function toHijri(date: Date) {
   const jd = Math.floor((date.getTime() / 86400000) + 2440587.5);
   const l = jd - 1948440 + 10632;
@@ -44,14 +90,65 @@ const Quran = () => {
   const [calendarType, setCalendarType] = useState<"hijri" | "miladi">("hijri");
   const [currentDate] = useState(new Date());
 
+  // Quran reader state
+  const [currentPage, setCurrentPage] = useState(() => {
+    const saved = localStorage.getItem("quran_last_page");
+    return saved ? parseInt(saved) : 1;
+  });
+  const [selectedSura, setSelectedSura] = useState<string>("");
+  const [goToPage, setGoToPage] = useState("");
+  const [lastRead, setLastRead] = useState(() => {
+    const saved = localStorage.getItem("quran_bookmark");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Save current page to localStorage
+  useEffect(() => {
+    localStorage.setItem("quran_last_page", currentPage.toString());
+  }, [currentPage]);
+
+  const saveBookmark = () => {
+    const currentSura = getCurrentSura();
+    const bookmark = { page: currentPage, sura: currentSura, date: new Date().toLocaleDateString("ar-EG") };
+    localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+    setLastRead(bookmark);
+  };
+
+  const getCurrentSura = () => {
+    for (let i = suraList.length - 1; i >= 0; i--) {
+      if (currentPage >= suraList[i].startPage) return suraList[i].name;
+    }
+    return "الفاتحة";
+  };
+
+  const getVerses = () => {
+    if (currentPage <= 1) return sampleVerses[1];
+    if (currentPage <= 49) return sampleVerses[2];
+    return { sura: getCurrentSura(), verses: ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "..."] };
+  };
+
+  const handleSuraSelect = (value: string) => {
+    setSelectedSura(value);
+    const sura = suraList.find(s => s.number.toString() === value);
+    if (sura) setCurrentPage(sura.startPage);
+  };
+
+  const handleGoToPage = () => {
+    const p = parseInt(goToPage);
+    if (p >= 1 && p <= 604) {
+      setCurrentPage(p);
+      setGoToPage("");
+    }
+  };
+
   const toggleTask = (id: string) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
 
   const hijri = toHijri(currentDate);
   const nextPrayer = prayerTimes.find(p => p.next);
+  const currentVerses = getVerses();
 
-  // Generate calendar days
   const generateCalendarDays = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -132,18 +229,91 @@ const Quran = () => {
 
         {/* Quran Reader */}
         <TabsContent value="quran" className="space-y-4 mt-4">
+          {/* Last read bookmark */}
+          {lastRead && (
+            <div
+              className="bg-primary/10 rounded-2xl p-3 border border-primary/20 flex items-center justify-between cursor-pointer hover:bg-primary/15 transition-colors"
+              onClick={() => setCurrentPage(lastRead.page)}
+            >
+              <Button variant="ghost" size="sm" className="text-primary text-xs">
+                متابعة القراءة ←
+              </Button>
+              <div className="flex items-center gap-2 text-right">
+                <div>
+                  <p className="text-xs font-semibold">آخر قراءة: {lastRead.sura}</p>
+                  <p className="text-[10px] text-muted-foreground">صفحة {lastRead.page} • {lastRead.date}</p>
+                </div>
+                <Bookmark className="w-4 h-4 text-primary" />
+              </div>
+            </div>
+          )}
+
+          {/* Sura & Page selection */}
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
+            <h4 className="font-semibold text-right">اختر السورة أو الصفحة</h4>
+            <div className="flex gap-2">
+              <Select value={selectedSura} onValueChange={handleSuraSelect}>
+                <SelectTrigger className="flex-1 text-right">
+                  <SelectValue placeholder="اختر سورة..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {suraList.map(s => (
+                    <SelectItem key={s.number} value={s.number.toString()}>
+                      {s.number}. {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleGoToPage} size="sm" className="shrink-0">انتقل</Button>
+              <Input
+                value={goToPage}
+                onChange={(e) => setGoToPage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleGoToPage()}
+                placeholder="رقم الصفحة (1-604)..."
+                type="number"
+                min={1}
+                max={604}
+                className="text-right"
+              />
+            </div>
+          </div>
+
+          {/* Reader */}
           <div className="bg-card rounded-2xl p-5 border border-border text-center space-y-4">
-            <h3 className="text-xl font-bold">القرآن الكريم</h3>
-            <p className="text-sm text-muted-foreground">سورة البقرة (Al-Baqara)</p>
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
+                <Bookmark className="w-4 h-4 ml-1" /> حفظ
+              </Button>
+              <div>
+                <h3 className="text-xl font-bold">سورة {currentVerses.sura}</h3>
+                <p className="text-xs text-muted-foreground">صفحة {currentPage}</p>
+              </div>
+            </div>
             <div className="bg-muted/50 rounded-xl p-6 space-y-4 text-lg leading-loose" style={{ fontFamily: "'Traditional Arabic', serif" }}>
-              <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الم ﴿١﴾</p>
-              <p>ذَٰلِكَ الْكِتَابُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِلْمُتَّقِينَ ﴿٢﴾</p>
-              <p>الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُقِيمُونَ الصَّلَاةَ وَمِمَّا رَزَقْنَاهُمْ يُنْفِقُونَ ﴿٣﴾</p>
+              {currentVerses.verses.map((v, i) => (
+                <p key={i}>{v}</p>
+              ))}
             </div>
             <div className="flex items-center justify-center gap-4">
-              <Button variant="outline" size="sm">← السابق</Button>
-              <span className="text-sm text-muted-foreground">الصفحة: 2 / 604</span>
-              <Button variant="outline" size="sm">التالي →</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(604, p + 1))}
+              >
+                ← السابق
+              </Button>
+              <span className="text-sm text-muted-foreground font-semibold">
+                {currentPage} / 604
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              >
+                التالي →
+              </Button>
             </div>
           </div>
         </TabsContent>
@@ -151,57 +321,25 @@ const Quran = () => {
         {/* Calendar */}
         <TabsContent value="calendar" className="space-y-4 mt-4">
           <div className="bg-card rounded-2xl p-4 border border-border space-y-4">
-            {/* Calendar type toggle */}
             <div className="flex justify-center gap-2">
-              <Button
-                size="sm"
-                variant={calendarType === "miladi" ? "default" : "outline"}
-                onClick={() => setCalendarType("miladi")}
-                className="text-xs"
-              >
-                ميلادي
-              </Button>
-              <Button
-                size="sm"
-                variant={calendarType === "hijri" ? "default" : "outline"}
-                onClick={() => setCalendarType("hijri")}
-                className="text-xs"
-              >
-                هجري
-              </Button>
+              <Button size="sm" variant={calendarType === "miladi" ? "default" : "outline"} onClick={() => setCalendarType("miladi")} className="text-xs">ميلادي</Button>
+              <Button size="sm" variant={calendarType === "hijri" ? "default" : "outline"} onClick={() => setCalendarType("hijri")} className="text-xs">هجري</Button>
             </div>
-
-            {/* Calendar Header */}
             <div className="text-center space-y-1">
               <h3 className="text-lg font-bold">
-                {calendarType === "hijri"
-                  ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
-                  : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-                }
+                {calendarType === "hijri" ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ` : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {calendarType === "hijri"
-                  ? `${currentDate.getDate()} ${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-                  : `${hijri.day} ${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
-                }
+                {calendarType === "hijri" ? `${currentDate.getDate()} ${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}` : `${hijri.day} ${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`}
               </p>
             </div>
-
-            {/* Today info */}
             <div className="bg-primary/10 rounded-xl p-4 text-center space-y-1">
               <p className="text-sm text-muted-foreground">{dayNames[currentDate.getDay()]}</p>
-              <p className="text-4xl font-bold text-primary">
-                {calendarType === "hijri" ? hijri.day : currentDate.getDate()}
-              </p>
+              <p className="text-4xl font-bold text-primary">{calendarType === "hijri" ? hijri.day : currentDate.getDate()}</p>
               <p className="text-sm font-semibold">
-                {calendarType === "hijri"
-                  ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
-                  : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-                }
+                {calendarType === "hijri" ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ` : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
               </p>
             </div>
-
-            {/* Mini calendar grid */}
             <div className="space-y-2">
               <div className="grid grid-cols-7 gap-1 text-center">
                 {["أح", "إث", "ثل", "أر", "خم", "جم", "سب"].map(d => (
@@ -210,21 +348,12 @@ const Quran = () => {
               </div>
               <div className="grid grid-cols-7 gap-1 text-center">
                 {generateCalendarDays().map((day, i) => (
-                  <div
-                    key={i}
-                    className={`text-xs py-1.5 rounded-lg ${
-                      day === currentDate.getDate()
-                        ? "bg-primary text-primary-foreground font-bold"
-                        : day ? "hover:bg-muted cursor-pointer" : ""
-                    }`}
-                  >
+                  <div key={i} className={`text-xs py-1.5 rounded-lg ${day === currentDate.getDate() ? "bg-primary text-primary-foreground font-bold" : day ? "hover:bg-muted cursor-pointer" : ""}`}>
                     {day || ""}
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Calendar Info */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between items-center py-2 border-t border-border">
                 <span className="text-muted-foreground">{dayNames[currentDate.getDay()]}</span>

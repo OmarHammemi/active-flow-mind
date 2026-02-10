@@ -20,11 +20,7 @@ interface WeightEntry {
 }
 
 const Sport = () => {
-  const [tasks, setTasks] = useState<SportTask[]>([
-    { id: "1", name: "تمارين الضغط", target: 100, current: 0, icon: "💪" },
-    { id: "2", name: "تمارين البطن", target: 50, current: 0, icon: "❤️" },
-    { id: "3", name: "جري 30 دقيقة", target: 1, current: 0, icon: "🏃" },
-  ]);
+  const [tasks, setTasks] = useState<SportTask[]>([]);
   const [newTask, setNewTask] = useState("");
   const [newTarget, setNewTarget] = useState("");
 
