@@ -1,0 +1,268 @@
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2 } from "lucide-react";
+
+const prayerTimes = [
+  { name: "الفجر", time: "05:30", passed: true },
+  { name: "الشروق", time: "07:05", passed: true },
+  { name: "الظهر", time: "12:45", passed: false, next: true },
+  { name: "العصر", time: "15:50", passed: false },
+  { name: "المغرب", time: "18:20", passed: false },
+  { name: "العشاء", time: "19:50", passed: false },
+];
+
+const quranTasks = [
+  { id: "1", text: "قراءة ورد القرآن اليومي", done: false },
+  { id: "2", text: "الصلاة في وقتها", done: false },
+  { id: "3", text: "أذكار الصباح والمساء", done: false },
+  { id: "4", text: "صلاة الاستغفار", done: false },
+  { id: "5", text: "قراءة سورة الكهف (الجمعة)", done: false },
+];
+
+// Hijri month names
+const hijriMonths = ["محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
+const miladiMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+// Simple Gregorian-to-Hijri approximation
+function toHijri(date: Date) {
+  const jd = Math.floor((date.getTime() / 86400000) + 2440587.5);
+  const l = jd - 1948440 + 10632;
+  const n = Math.floor((l - 1) / 10631);
+  const l2 = l - 10631 * n + 354;
+  const j = Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) + Math.floor(l2 / 5670) * Math.floor((43 * l2) / 15238);
+  const l3 = l2 - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) - Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+  const month = Math.floor((24 * l3) / 709);
+  const day = l3 - Math.floor((709 * month) / 24);
+  const year = 30 * n + j - 30;
+  return { year, month, day };
+}
+
+const Quran = () => {
+  const [tasks, setTasks] = useState(quranTasks);
+  const [calendarType, setCalendarType] = useState<"hijri" | "miladi">("hijri");
+  const [currentDate] = useState(new Date());
+
+  const toggleTask = (id: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const hijri = toHijri(currentDate);
+  const nextPrayer = prayerTimes.find(p => p.next);
+
+  // Generate calendar days
+  const generateCalendarDays = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  return (
+    <div className="pb-4">
+      <div className="mx-4 bg-card rounded-2xl p-4 border border-border mb-4">
+        <div className="flex items-center justify-between">
+          <div className="text-left">
+            <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full">+XP 0</span>
+            <p className="text-xs text-muted-foreground mt-1">0/5 مكتمل</p>
+            <p className="text-2xl font-bold">0%</p>
+          </div>
+          <div className="flex items-center gap-2 text-right">
+            <div>
+              <h2 className="text-lg font-bold">القرآن والصلاة</h2>
+              <p className="text-xs text-muted-foreground">تقوية علاقتك بالله</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Tabs defaultValue="prayer" className="px-4">
+        <TabsList className="w-full bg-card border border-border">
+          <TabsTrigger value="tasks" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <ListTodo className="w-3.5 h-3.5 ml-1" /> المهام
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <CalendarIcon className="w-3.5 h-3.5 ml-1" /> التقويم
+          </TabsTrigger>
+          <TabsTrigger value="quran" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <BookOpen className="w-3.5 h-3.5 ml-1" /> القرآن
+          </TabsTrigger>
+          <TabsTrigger value="prayer" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Clock className="w-3.5 h-3.5 ml-1" /> الصلاة
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Prayer Times */}
+        <TabsContent value="prayer" className="space-y-3 mt-4">
+          <h3 className="font-bold text-right">مواقيت الصلاة</h3>
+          {nextPrayer && (
+            <div className="bg-card rounded-2xl p-4 border border-primary/30 border-2">
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <span className="text-2xl font-bold text-primary">{nextPrayer.time}</span>
+                  <p className="text-xs text-muted-foreground">باقي ٢ ساعة</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">الصلاة القادمة</p>
+                  <p className="text-xl font-bold">{nextPrayer.name}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            {prayerTimes.map((prayer, i) => (
+              <div key={i} className={`flex items-center justify-between px-4 py-3 border-b border-border last:border-0 ${prayer.next ? "bg-primary/10" : ""}`}>
+                <span className={`font-semibold ${prayer.next ? "text-primary" : ""}`}>{prayer.time}</span>
+                <div className="flex items-center gap-2">
+                  <span className={prayer.next ? "font-bold" : ""}>{prayer.name}</span>
+                  <span className={`w-2 h-2 rounded-full ${prayer.passed ? "bg-primary" : prayer.next ? "bg-primary animate-pulse" : "bg-muted-foreground/30"}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Quran Reader */}
+        <TabsContent value="quran" className="space-y-4 mt-4">
+          <div className="bg-card rounded-2xl p-5 border border-border text-center space-y-4">
+            <h3 className="text-xl font-bold">القرآن الكريم</h3>
+            <p className="text-sm text-muted-foreground">سورة البقرة (Al-Baqara)</p>
+            <div className="bg-muted/50 rounded-xl p-6 space-y-4 text-lg leading-loose" style={{ fontFamily: "'Traditional Arabic', serif" }}>
+              <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الم ﴿١﴾</p>
+              <p>ذَٰلِكَ الْكِتَابُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِلْمُتَّقِينَ ﴿٢﴾</p>
+              <p>الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُقِيمُونَ الصَّلَاةَ وَمِمَّا رَزَقْنَاهُمْ يُنْفِقُونَ ﴿٣﴾</p>
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <Button variant="outline" size="sm">← السابق</Button>
+              <span className="text-sm text-muted-foreground">الصفحة: 2 / 604</span>
+              <Button variant="outline" size="sm">التالي →</Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Calendar */}
+        <TabsContent value="calendar" className="space-y-4 mt-4">
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-4">
+            {/* Calendar type toggle */}
+            <div className="flex justify-center gap-2">
+              <Button
+                size="sm"
+                variant={calendarType === "miladi" ? "default" : "outline"}
+                onClick={() => setCalendarType("miladi")}
+                className="text-xs"
+              >
+                ميلادي
+              </Button>
+              <Button
+                size="sm"
+                variant={calendarType === "hijri" ? "default" : "outline"}
+                onClick={() => setCalendarType("hijri")}
+                className="text-xs"
+              >
+                هجري
+              </Button>
+            </div>
+
+            {/* Calendar Header */}
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-bold">
+                {calendarType === "hijri"
+                  ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
+                  : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+                }
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {calendarType === "hijri"
+                  ? `${currentDate.getDate()} ${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+                  : `${hijri.day} ${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
+                }
+              </p>
+            </div>
+
+            {/* Today info */}
+            <div className="bg-primary/10 rounded-xl p-4 text-center space-y-1">
+              <p className="text-sm text-muted-foreground">{dayNames[currentDate.getDay()]}</p>
+              <p className="text-4xl font-bold text-primary">
+                {calendarType === "hijri" ? hijri.day : currentDate.getDate()}
+              </p>
+              <p className="text-sm font-semibold">
+                {calendarType === "hijri"
+                  ? `${hijriMonths[hijri.month - 1]} ${hijri.year} هـ`
+                  : `${miladiMonths[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+                }
+              </p>
+            </div>
+
+            {/* Mini calendar grid */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {["أح", "إث", "ثل", "أر", "خم", "جم", "سب"].map(d => (
+                  <span key={d} className="text-[10px] text-muted-foreground font-medium py-1">{d}</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {generateCalendarDays().map((day, i) => (
+                  <div
+                    key={i}
+                    className={`text-xs py-1.5 rounded-lg ${
+                      day === currentDate.getDate()
+                        ? "bg-primary text-primary-foreground font-bold"
+                        : day ? "hover:bg-muted cursor-pointer" : ""
+                    }`}
+                  >
+                    {day || ""}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Calendar Info */}
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center py-2 border-t border-border">
+                <span className="text-muted-foreground">{dayNames[currentDate.getDay()]}</span>
+                <span className="font-semibold">اليوم</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-t border-border">
+                <span className="text-muted-foreground">{hijri.day} {hijriMonths[hijri.month - 1]} {hijri.year} هـ</span>
+                <span className="font-semibold">التاريخ الهجري</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-t border-border">
+                <span className="text-muted-foreground">{currentDate.getDate()} {miladiMonths[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+                <span className="font-semibold">التاريخ الميلادي</span>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tasks */}
+        <TabsContent value="tasks" className="space-y-3 mt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">0/{tasks.length}</span>
+            <h3 className="font-bold">المهام اليومية</h3>
+          </div>
+          {tasks.map((task) => (
+            <div key={task.id} className="bg-card rounded-xl p-4 border border-border flex items-center justify-between">
+              <div />
+              <div className="flex items-center gap-3">
+                <span className={`text-sm ${task.done ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
+                <button onClick={() => toggleTask(task.id)}>
+                  {task.done ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <Circle className="w-5 h-5 text-muted-foreground" />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default Quran;
