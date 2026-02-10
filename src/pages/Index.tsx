@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Flame, Star, BookOpen, Briefcase, Dumbbell, GraduationCap } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area } from "recharts";
 
 const weekData = [
   { day: "السبت", quran: 10, work: 5, sport: 8, knowledge: 3 },
@@ -128,6 +128,49 @@ const Index = () => {
               <Line type="monotone" dataKey="knowledge" stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Detailed Analytics */}
+      <div className="px-4 space-y-3">
+        <h3 className="text-lg font-bold text-right">تحليل تفصيلي</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { name: "القرآن", icon: BookOpen, color: "bg-emerald-500", stroke: "#10b981", fill: "#10b98133", dataKey: "quran", avg: 33, high: 100 },
+            { name: "العمل", icon: Briefcase, color: "bg-blue-500", stroke: "#3b82f6", fill: "#3b82f633", dataKey: "work", avg: 17, high: 100 },
+            { name: "الرياضة", icon: Dumbbell, color: "bg-orange-500", stroke: "#f97316", fill: "#f9731633", dataKey: "sport", avg: 21, high: 80 },
+            { name: "المعرفة", icon: GraduationCap, color: "bg-pink-500", stroke: "#ec4899", fill: "#ec489933", dataKey: "knowledge", avg: 29, high: 100 },
+          ].map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <div key={cat.name} className="bg-card rounded-2xl p-4 border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-primary font-semibold">0%</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold">{cat.name}</span>
+                    <div className={`w-5 h-5 rounded-md ${cat.color} flex items-center justify-center`}>
+                      <Icon className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <div><span className="font-semibold text-foreground">{cat.high}%</span><br/>الأعلى</div>
+                  <div className="text-right"><span className="font-semibold text-foreground">{cat.avg}%</span><br/>المتوسط</div>
+                </div>
+                <ResponsiveContainer width="100%" height={60}>
+                  <AreaChart data={weekData}>
+                    <defs>
+                      <linearGradient id={`grad-${cat.dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={cat.stroke} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={cat.stroke} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey={cat.dataKey} stroke={cat.stroke} fill={`url(#grad-${cat.dataKey})`} strokeWidth={2} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
