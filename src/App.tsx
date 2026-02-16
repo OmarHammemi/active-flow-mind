@@ -12,7 +12,7 @@ import Sport from "./pages/Sport";
 import Knowledge from "./pages/Knowledge";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
-
+// Cache bust: 2024-02-15-19:40
 const queryClient = new QueryClient();
 
 const App = () => (
