@@ -146,10 +146,8 @@ const Landing = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className={`text-xl font-bold text-primary-foreground ${isRTL ? "font-arabic" : ""}`}>
-                {isRTL ? "ف" : "F"}
-              </span>
+            <div className="w-10 h-10 flex items-center justify-center">
+              <img src="/logo.svg" alt="فلاح" className="w-10 h-10" />
             </div>
             <div>
               <h1 className={`font-bold text-lg text-foreground ${isRTL ? "font-arabic" : ""}`}>

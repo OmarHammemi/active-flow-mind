@@ -13,8 +13,8 @@ const AppHeader = () => {
           <h1 className="text-lg font-bold text-primary">فلاح</h1>
           <p className="text-[10px] text-muted-foreground -mt-1">متتبع الأهداف</p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-          <span className="text-primary text-sm">🌙</span>
+        <div className="w-8 h-8 flex items-center justify-center">
+          <img src="/logo.svg" alt="فلاح" className="w-8 h-8" />
         </div>
       </div>
     </header>

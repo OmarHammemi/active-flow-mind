@@ -16,11 +16,11 @@ export default defineConfig(({ mode }) => ({
       "localhost",
     ],
     hmr: {
-  host: "falah.live",
-  port: 3006,    // Use the same port as your server
-  protocol: "ws", // Use ws (not wss) for HTTP
-  overlay: false,
-},
+      host: "falah.live",
+      port: 3006,
+      protocol: "ws",
+      overlay: false,
+    },
     cors: true,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

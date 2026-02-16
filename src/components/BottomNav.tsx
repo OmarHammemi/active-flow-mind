@@ -7,7 +7,7 @@ const navItems = [
   { path: "/sport", label: "الرياضة", icon: Dumbbell },
   { path: "/work", label: "العمل", icon: Briefcase },
   { path: "/quran", label: "القرآن", icon: BookOpen },
-  { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
+  { path: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
 ];
 
 const BottomNav = () => {
@@ -19,7 +19,7 @@ const BottomNav = () => {
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || 
-            (item.path !== "/" && location.pathname.startsWith(item.path));
+            (item.path !== "/dashboard" && location.pathname.startsWith(item.path));
           const Icon = item.icon;
           return (
             <button

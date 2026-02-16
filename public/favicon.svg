@@ -1,0 +1,106 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Dark blue background gradient -->
+    <linearGradient id="blueBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1a2f4d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#152238;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Golden gradient with highlights -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE5B4;stop-opacity:1" />
+      <stop offset="20%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D4AF37;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Bright gold highlight for 3D effect -->
+    <linearGradient id="goldHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF8DC;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFD700;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.7" />
+    </linearGradient>
+    
+    <!-- Shadow for depth -->
+    <filter id="shadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Rounded square background (dark blue) -->
+  <rect x="28" y="28" width="200" height="200" rx="45" ry="45" fill="url(#blueBg)" />
+  
+  <!-- Top golden sphere (small dot) -->
+  <circle cx="128" cy="75" r="8" fill="url(#goldGradient)" filter="url(#glow)"/>
+  <circle cx="128" cy="75" r="5" fill="url(#goldHighlight)" opacity="0.9"/>
+  
+  <!-- Inverted U arch (dome shape) -->
+  <path d="M 105 75 Q 128 100 151 75" 
+        stroke="url(#goldGradient)" 
+        stroke-width="8" 
+        fill="none" 
+        stroke-linecap="round" 
+        filter="url(#glow)"/>
+  <path d="M 105 75 Q 128 100 151 75" 
+        stroke="url(#goldHighlight)" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round" 
+        opacity="0.8"/>
+  
+  <!-- Main flowing ribbon (thick, sweeping curve) -->
+  <path d="M 151 75 Q 170 90 178 125 Q 186 160 172 195 Q 158 220 140 210" 
+        stroke="url(#goldGradient)" 
+        stroke-width="12" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
+  
+  <!-- Highlight on main ribbon for 3D effect -->
+  <path d="M 151 75 Q 170 90 178 125 Q 186 160 172 195 Q 158 220 140 210" 
+        stroke="url(#goldHighlight)" 
+        stroke-width="3" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        opacity="0.9"/>
+  
+  <!-- Secondary ribbon layer for depth -->
+  <path d="M 148 80 Q 165 95 170 130 Q 175 165 163 190 Q 151 210 135 200" 
+        stroke="url(#goldGradient)" 
+        stroke-width="9" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)"
+        opacity="0.8"/>
+  
+  <!-- Additional highlight on secondary ribbon -->
+  <path d="M 148 80 Q 165 95 170 130 Q 175 165 163 190 Q 151 210 135 200" 
+        stroke="url(#goldHighlight)" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        opacity="0.7"/>
+</svg>
