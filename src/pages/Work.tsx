@@ -25,6 +25,11 @@ const Work = () => {
   const doneCount = completedToday.length;
   const totalCount = workTasks.length;
 
+  // Calculate weighted progress based on importance
+  const totalImportance = workTasks.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const completedImportance = completedToday.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const progressPercentage = totalImportance > 0 ? Math.round((completedImportance / totalImportance) * 100) : 0;
+
   const handleToggleTask = async (task: Task) => {
     const isCompleted = task.completed_dates?.includes(todayStr) || false;
     if (isCompleted) {
@@ -75,7 +80,7 @@ const Work = () => {
               {doneCount}/{totalCount} {isRTL ? "مكتمل" : "completed"}
             </p>
             <p className="text-2xl font-bold">
-              {totalCount ? Math.round((doneCount / totalCount) * 100) : 0}%
+              {progressPercentage}%
             </p>
           </div>
           <div className="flex items-center gap-2 text-right">
@@ -136,24 +141,31 @@ const Work = () => {
                           <Circle className="w-5 h-5 text-muted-foreground" />
                         )}
                       </button>
-                      <div className="flex-1 text-right">
-                        <span
-                          className={`text-sm block ${
-                            isCompleted ? "line-through text-muted-foreground" : ""
-                          }`}
-                        >
-                          {task.title}
-                        </span>
-                        {task.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {task.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                          <ScheduleIcon className="w-3 h-3" />
-                          <span>{scheduleInfo.text}</span>
+                        <div className="flex-1 text-right">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span
+                              className={`text-sm block flex-1 ${
+                                isCompleted ? "line-through text-muted-foreground" : ""
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                            {task.importance && (
+                              <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                {task.importance}%
+                              </span>
+                            )}
+                          </div>
+                          {task.description && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {task.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <ScheduleIcon className="w-3 h-3" />
+                            <span>{scheduleInfo.text}</span>
+                          </div>
                         </div>
-                      </div>
                     </div>
                     <button
                       onClick={() => deleteTask(task.id)}

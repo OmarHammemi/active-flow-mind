@@ -50,6 +50,8 @@ export interface Task {
   // Status
   completed: boolean;
   completed_dates?: string[]; // Array of ISO date strings when task was completed
+  // Importance/Weight (percentage, should sum to 100% for all tasks in a category)
+  importance?: number; // Percentage (0-100)
   created_at: string;
   updated_at: string;
 }

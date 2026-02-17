@@ -244,9 +244,9 @@ const Landing = () => {
                     <ArrowRight className={`w-5 h-5 ${isRTL ? "rotate-180" : ""}`} />
                   </Button>
                 </Link>
-                <Link to="/dashboard">
+                <Link to="/signin">
                   <Button size="lg" variant="outline" className={isRTL ? "font-arabic" : ""}>
-                    {isRTL ? "عرض تجريبي" : "View Demo"}
+                    {currentContent.signIn}
                   </Button>
                 </Link>
               </div>

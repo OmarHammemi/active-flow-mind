@@ -9,12 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Plus, Target } from "lucide-react";
 import { format } from "date-fns";
 import { useTasks } from "@/contexts/TaskContext";
 import { TaskScheduleType } from "@/lib/supabase";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
+import { Slider } from "@/components/ui/slider";
 
 interface CreateTaskDialogProps {
   category: 'work' | 'sport' | 'knowledge' | 'quran' | 'other';
@@ -48,10 +49,19 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
   
   // One-time schedule
   const [oneTimeDate, setOneTimeDate] = useState<Date>(new Date());
+  
+  // Importance percentage
+  const [importance, setImportance] = useState<number[]>([10]);
 
-  const { createTask } = useTasks();
+  const { createTask, tasks } = useTasks();
   const { isRTL } = useLanguage();
   const { toast } = useToast();
+
+  // Calculate current total importance for this category
+  const currentCategoryTasks = tasks.filter(t => t.category === category);
+  const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => sum + (t.importance || 0), 0);
+  const remainingImportance = 100 - currentTotalImportance;
+  const maxImportance = Math.min(remainingImportance + (importance[0] || 0), 100);
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -63,11 +73,32 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
       return;
     }
 
+    // Validate importance
+    const importanceValue = importance[0] || 0;
+    if (importanceValue <= 0) {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: isRTL ? "يرجى تحديد أهمية المهمة (أكبر من 0%)" : "Please set task importance (greater than 0%)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (currentTotalImportance + importanceValue > 100) {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: isRTL ? `إجمالي الأهمية يجب أن يكون 100%. المتبقي: ${remainingImportance}%` : `Total importance must be 100%. Remaining: ${remainingImportance}%`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     let taskData: any = {
       title: title.trim(),
       description: description.trim() || undefined,
       category,
       schedule_type: scheduleType,
+      importance: importanceValue,
     };
 
     if (scheduleType === 'daily') {
@@ -112,6 +143,7 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
       setWeeklyStartDate(new Date());
       setWeeklyWeeks(1);
       setOneTimeDate(new Date());
+      setImportance([10]);
     }
   };
 
@@ -293,6 +325,35 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
               </Popover>
             </div>
           )}
+
+          <div className="space-y-2 border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                {isRTL ? "أهمية المهمة" : "Task Importance"}
+              </Label>
+              <span className="text-sm font-semibold text-primary">
+                {importance[0]}%
+              </span>
+            </div>
+            <Slider
+              value={importance}
+              onValueChange={setImportance}
+              min={1}
+              max={maxImportance}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{isRTL ? "المتبقي:" : "Remaining:"} {remainingImportance}%</span>
+              <span>{isRTL ? "الإجمالي:" : "Total:"} {currentTotalImportance + importance[0]}%</span>
+            </div>
+            {currentTotalImportance + importance[0] > 100 && (
+              <p className="text-xs text-destructive">
+                {isRTL ? "تحذير: الإجمالي يتجاوز 100%" : "Warning: Total exceeds 100%"}
+              </p>
+            )}
+          </div>
 
           <div className="flex gap-2 pt-4">
             <Button onClick={handleSubmit} className="flex-1">

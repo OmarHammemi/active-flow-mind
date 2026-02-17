@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GraduationCap, BookMarked, ListTodo, Plus, X, Circle, CheckCircle2, BookOpen } from "lucide-react";
-
-interface KTask {
-  id: string;
-  text: string;
-  done: boolean;
-}
+import { GraduationCap, BookMarked, ListTodo, Plus, X, Circle, CheckCircle2, BookOpen, Clock, Calendar } from "lucide-react";
+import { useTasks } from "@/contexts/TaskContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import CreateTaskDialog from "@/components/CreateTaskDialog";
+import { format } from "date-fns";
+import { Task } from "@/lib/supabase";
 
 interface Book {
   id: string;
@@ -19,11 +18,9 @@ interface Book {
 }
 
 const Knowledge = () => {
-  const [tasks, setTasks] = useState<KTask[]>([
-    { id: "1", text: "قراءة 30 دقيقة يومياً", done: false },
-    { id: "2", text: "مراجعة الملاحظات", done: false },
-  ]);
-  const [newTask, setNewTask] = useState("");
+  const { tasks, loading, deleteTask, completeTask, uncompleteTask, getTasksForDate } = useTasks();
+  const { isRTL } = useLanguage();
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [books, setBooks] = useState<Book[]>([
     { id: "1", title: "العادات الذرية", author: "جيمس كلير", currentPage: 45, totalPages: 320 },
@@ -33,18 +30,54 @@ const Knowledge = () => {
   const [newBookAuthor, setNewBookAuthor] = useState("");
   const [newBookPages, setNewBookPages] = useState("");
 
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    setTasks([...tasks, { id: Date.now().toString(), text: newTask, done: false }]);
-    setNewTask("");
+  // Filter tasks for knowledge category and current date
+  const knowledgeTasks = useMemo(() => {
+    const todayTasks = getTasksForDate(selectedDate);
+    return todayTasks.filter(task => task.category === 'knowledge');
+  }, [tasks, selectedDate, getTasksForDate]);
+
+  const todayStr = selectedDate.toISOString().split('T')[0];
+  const completedToday = knowledgeTasks.filter(task => {
+    return task.completed_dates?.includes(todayStr) || false;
+  });
+  const doneCount = completedToday.length;
+  const totalCount = knowledgeTasks.length;
+
+  // Calculate weighted progress based on importance
+  const totalImportance = knowledgeTasks.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const completedImportance = completedToday.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const progressPercentage = totalImportance > 0 ? Math.round((completedImportance / totalImportance) * 100) : 0;
+
+  const handleToggleTask = async (task: Task) => {
+    const isCompleted = task.completed_dates?.includes(todayStr) || false;
+    if (isCompleted) {
+      await uncompleteTask(task.id, todayStr);
+    } else {
+      await completeTask(task.id, todayStr);
+    }
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  };
-
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
+  const getScheduleInfo = (task: Task) => {
+    if (task.schedule_type === 'daily') {
+      return { icon: Clock, text: isRTL ? "يومي" : "Daily" };
+    } else if (task.schedule_type === 'weekly') {
+      const days = task.weekly_days || [];
+      const dayNames = days.map(d => {
+        const dayMap: { [key: number]: string } = {
+          0: isRTL ? "أحد" : "Sun",
+          1: isRTL ? "إثنين" : "Mon",
+          2: isRTL ? "ثلاثاء" : "Tue",
+          3: isRTL ? "أربعاء" : "Wed",
+          4: isRTL ? "خميس" : "Thu",
+          5: isRTL ? "جمعة" : "Fri",
+          6: isRTL ? "سبت" : "Sat",
+        };
+        return dayMap[d];
+      });
+      return { icon: Calendar, text: dayNames.join(", ") };
+    } else {
+      return { icon: Calendar, text: isRTL ? "مرة واحدة" : "One-time" };
+    }
   };
 
   const addBook = () => {
@@ -69,21 +102,23 @@ const Knowledge = () => {
     setBooks(books.filter(b => b.id !== id));
   };
 
-  const doneCount = tasks.filter(t => t.done).length;
-
   return (
     <div className="pb-4">
       <div className="mx-4 bg-card rounded-2xl p-4 border border-border mb-4">
         <div className="flex items-center justify-between">
           <div className="text-left">
             <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full">+XP 0</span>
-            <p className="text-xs text-muted-foreground mt-1">{doneCount}/{tasks.length} مكتمل</p>
-            <p className="text-2xl font-bold">{tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0}%</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {doneCount}/{totalCount} {isRTL ? "مكتمل" : "completed"}
+            </p>
+            <p className="text-2xl font-bold">
+              {progressPercentage}%
+            </p>
           </div>
           <div className="flex items-center gap-2 text-right">
             <div>
-              <h2 className="text-lg font-bold">المعرفة والتعلم</h2>
-              <p className="text-xs text-muted-foreground">اغتنم وقتك بالعلم النافع</p>
+              <h2 className="text-lg font-bold">{isRTL ? "المعرفة والتعلم" : "Knowledge & Learning"}</h2>
+              <p className="text-xs text-muted-foreground">{isRTL ? "اغتنم وقتك بالعلم النافع" : "Make the most of your time with beneficial knowledge"}</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-pink-500 flex items-center justify-center">
               <GraduationCap className="w-5 h-5 text-white" />
@@ -104,26 +139,95 @@ const Knowledge = () => {
 
         {/* Tasks */}
         <TabsContent value="tasks" className="space-y-3 mt-4">
-          {tasks.map((task) => (
-            <div key={task.id} className="bg-card rounded-xl p-4 border border-border flex items-center justify-between">
-              <button onClick={() => deleteTask(task.id)} className="text-muted-foreground hover:text-destructive">
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-3">
-                <span className={`text-sm ${task.done ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
-                <button onClick={() => toggleTask(task.id)}>
-                  {task.done ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <Circle className="w-5 h-5 text-muted-foreground" />}
-                </button>
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {totalCount} {isRTL ? "مهمة" : "tasks"}
+            </span>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold">{isRTL ? "إكمال المهام اليومية" : "Daily Tasks"}</h3>
+              <span className="text-xs text-muted-foreground">
+                {format(selectedDate, "yyyy-MM-dd")}
+              </span>
             </div>
-          ))}
+          </div>
+
+          {loading ? (
+            <div className="pb-4 flex items-center justify-center min-h-[200px]">
+              <p className="text-muted-foreground">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
+            </div>
+          ) : knowledgeTasks.length === 0 ? (
+            <div className="bg-card rounded-xl p-8 border border-border text-center">
+              <p className="text-muted-foreground mb-4">
+                {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
+              </p>
+              <CreateTaskDialog category="knowledge" />
+            </div>
+          ) : (
+            <>
+              {knowledgeTasks.map((task) => {
+                const isCompleted = task.completed_dates?.includes(todayStr) || false;
+                const scheduleInfo = getScheduleInfo(task);
+                const ScheduleIcon = scheduleInfo.icon;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="bg-card rounded-xl p-4 border border-border"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <button
+                          onClick={() => handleToggleTask(task)}
+                          className="shrink-0"
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-5 h-5 text-primary" />
+                          ) : (
+                            <Circle className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </button>
+                        <div className="flex-1 text-right">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span
+                              className={`text-sm block flex-1 ${
+                                isCompleted ? "line-through text-muted-foreground" : ""
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                            {task.importance && (
+                              <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                {task.importance}%
+                              </span>
+                            )}
+                          </div>
+                          {task.description && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {task.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <ScheduleIcon className="w-3 h-3" />
+                            <span>{scheduleInfo.text}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Add task */}
           <div className="bg-card rounded-xl p-3 border border-border">
-            <div className="flex gap-2 items-center">
-              <Button onClick={addTask} size="sm" variant="ghost" className="shrink-0 text-primary">
-                <Plus className="w-5 h-5" />
-              </Button>
-              <Input value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTask()} placeholder="أضف مهمة تعلم جديدة..." className="text-right border-0 bg-transparent focus-visible:ring-0" />
-            </div>
+            <CreateTaskDialog category="knowledge" />
           </div>
         </TabsContent>
 

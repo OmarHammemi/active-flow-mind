@@ -74,7 +74,15 @@ interface LanguageProviderProps {
 export const LanguageProvider = ({ children }: LanguageProviderProps) => {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem("language") as Language;
-    return saved || "ar"; // Default to Arabic
+    if (saved) return saved;
+    
+    // Detect browser language
+    const browserLang = navigator.language.split('-')[0].toLowerCase();
+    if (browserLang === 'ar') return "ar";
+    if (browserLang === 'en') return "en";
+    
+    // Default to Arabic
+    return "ar";
   });
 
   const setLanguage = (lang: Language) => {

@@ -11,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -24,7 +26,7 @@ const Profile = () => {
   const [target3, setTarget3] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { user, profile, updateProfile, refreshProfile, signOut } = useAuth();
-  const { isRTL } = useLanguage();
+  const { language, setLanguage, isRTL } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -35,6 +37,94 @@ const Profile = () => {
     habits: false,
     sounds: true,
   });
+
+  // Timezone state
+  const [timezone, setTimezone] = useState(() => {
+    const saved = localStorage.getItem("timezone");
+    return saved || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  });
+
+  // Time format state (12h or 24h)
+  const [timeFormat, setTimeFormat] = useState(() => {
+    const saved = localStorage.getItem("timeFormat");
+    return saved || "24";
+  });
+
+  // Update timezone in localStorage
+  useEffect(() => {
+    localStorage.setItem("timezone", timezone);
+  }, [timezone]);
+
+  // Update time format in localStorage
+  useEffect(() => {
+    localStorage.setItem("timeFormat", timeFormat);
+  }, [timeFormat]);
+
+  // Language options
+  const languages = [
+    { value: "ar", label: "العربية - Arabic" },
+    { value: "en", label: "English - الإنجليزية" },
+  ];
+
+  // Handle language change
+  const handleLanguageChange = (newLang: "ar" | "en") => {
+    setLanguage(newLang);
+    toast({
+      title: isRTL ? "تم التغيير" : "Changed",
+      description: isRTL ? `تم تغيير اللغة إلى ${newLang === "ar" ? "العربية" : "English"}` : `Language changed to ${newLang === "ar" ? "Arabic" : "English"}`,
+    });
+  };
+
+  // Comprehensive timezone options for all continents
+  const timezones = [
+    // Africa
+    { value: "Africa/Cairo", label: "القاهرة - Cairo (GMT+2)" },
+    { value: "Africa/Casablanca", label: "الدار البيضاء - Casablanca (GMT+1)" },
+    { value: "Africa/Johannesburg", label: "جوهانسبرغ - Johannesburg (GMT+2)" },
+    { value: "Africa/Lagos", label: "لاغوس - Lagos (GMT+1)" },
+    { value: "Africa/Nairobi", label: "نيروبي - Nairobi (GMT+3)" },
+    // Asia
+    { value: "Asia/Riyadh", label: "الرياض - Riyadh (GMT+3)" },
+    { value: "Asia/Dubai", label: "دبي - Dubai (GMT+4)" },
+    { value: "Asia/Kuwait", label: "الكويت - Kuwait (GMT+3)" },
+    { value: "Asia/Baghdad", label: "بغداد - Baghdad (GMT+3)" },
+    { value: "Asia/Tehran", label: "طهران - Tehran (GMT+3:30)" },
+    { value: "Asia/Karachi", label: "كراتشي - Karachi (GMT+5)" },
+    { value: "Asia/Dhaka", label: "دكا - Dhaka (GMT+6)" },
+    { value: "Asia/Bangkok", label: "بانكوك - Bangkok (GMT+7)" },
+    { value: "Asia/Singapore", label: "سنغافورة - Singapore (GMT+8)" },
+    { value: "Asia/Hong_Kong", label: "هونغ كونغ - Hong Kong (GMT+8)" },
+    { value: "Asia/Tokyo", label: "طوكيو - Tokyo (GMT+9)" },
+    { value: "Asia/Seoul", label: "سيول - Seoul (GMT+9)" },
+    { value: "Asia/Shanghai", label: "شنغهاي - Shanghai (GMT+8)" },
+    { value: "Asia/Kolkata", label: "مومباي - Mumbai (GMT+5:30)" },
+    // Europe
+    { value: "Europe/London", label: "لندن - London (GMT+0/+1)" },
+    { value: "Europe/Paris", label: "باريس - Paris (GMT+1/+2)" },
+    { value: "Europe/Berlin", label: "برلين - Berlin (GMT+1/+2)" },
+    { value: "Europe/Rome", label: "روما - Rome (GMT+1/+2)" },
+    { value: "Europe/Madrid", label: "مدريد - Madrid (GMT+1/+2)" },
+    { value: "Europe/Amsterdam", label: "أمستردام - Amsterdam (GMT+1/+2)" },
+    { value: "Europe/Athens", label: "أثينا - Athens (GMT+2/+3)" },
+    { value: "Europe/Moscow", label: "موسكو - Moscow (GMT+3)" },
+    { value: "Europe/Istanbul", label: "إسطنبول - Istanbul (GMT+3)" },
+    // Americas
+    { value: "America/New_York", label: "نيويورك - New York (GMT-5/-4)" },
+    { value: "America/Chicago", label: "شيكاغو - Chicago (GMT-6/-5)" },
+    { value: "America/Denver", label: "دنفر - Denver (GMT-7/-6)" },
+    { value: "America/Los_Angeles", label: "لوس أنجلوس - Los Angeles (GMT-8/-7)" },
+    { value: "America/Toronto", label: "تورونتو - Toronto (GMT-5/-4)" },
+    { value: "America/Mexico_City", label: "مكسيكو سيتي - Mexico City (GMT-6/-5)" },
+    { value: "America/Sao_Paulo", label: "ساو باولو - São Paulo (GMT-3)" },
+    { value: "America/Buenos_Aires", label: "بوينس آيرس - Buenos Aires (GMT-3)" },
+    { value: "America/Lima", label: "ليما - Lima (GMT-5)" },
+    // Oceania
+    { value: "Australia/Sydney", label: "سيدني - Sydney (GMT+10/+11)" },
+    { value: "Australia/Melbourne", label: "ميلبورن - Melbourne (GMT+10/+11)" },
+    { value: "Pacific/Auckland", label: "أوكلاند - Auckland (GMT+12/+13)" },
+    // UTC
+    { value: "UTC", label: "UTC (GMT+0)" },
+  ];
 
   // Initialize form with profile data
   useEffect(() => {
@@ -310,12 +400,61 @@ const Profile = () => {
 
           {/* Settings Section */}
           <div className="px-4 space-y-2">
-            <h3 className="font-bold text-right text-muted-foreground text-sm">الإعدادات العامة</h3>
+            <h3 className="font-bold text-right text-muted-foreground text-sm">{isRTL ? "الإعدادات العامة" : "General Settings"}</h3>
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              <SettingRow icon={Globe} label="المنطقة الزمنية" value="UTC+1" />
-              <SettingRow icon={Languages} label="اللغة" value="العربية" />
-              <SettingRow icon={Moon} label="الوضع الداكن" value="مفعل" />
-              <SettingRow icon={Clock} label="تنسيق الوقت" value="24 ساعة" last />
+              <ClickableSettingRow 
+                icon={Globe} 
+                label={isRTL ? "المنطقة الزمنية" : "Timezone"} 
+                value={timezones.find(tz => tz.value === timezone)?.label || timezone}
+                onClick={() => {}}
+                onSelect={(value) => {
+                  setTimezone(value);
+                  toast({
+                    title: isRTL ? "تم التغيير" : "Changed",
+                    description: isRTL ? "تم تحديث المنطقة الزمنية" : "Timezone updated",
+                  });
+                }}
+                options={timezones}
+                isRTL={isRTL}
+              />
+              <ClickableSettingRow 
+                icon={Languages} 
+                label={isRTL ? "اللغة" : "Language"} 
+                value={languages.find(lang => lang.value === language)?.label || (language === "ar" ? "العربية" : "English")}
+                onClick={() => {}}
+                onSelect={(value) => {
+                  handleLanguageChange(value as "ar" | "en");
+                }}
+                options={languages}
+                isRTL={isRTL}
+              />
+              <SettingRow icon={Moon} label={isRTL ? "الوضع الداكن" : "Dark Mode"} value={isRTL ? "مفعل" : "Enabled"} isRTL={isRTL} />
+              <ClickableSettingRow 
+                icon={Clock} 
+                label={isRTL ? "تنسيق الوقت" : "Time Format"} 
+                value={timeFormat === "24" ? (isRTL ? "24 ساعة" : "24 hours") : (isRTL ? "12 ساعة" : "12 hours")}
+                onClick={() => {
+                  const newFormat = timeFormat === "24" ? "12" : "24";
+                  setTimeFormat(newFormat);
+                  toast({
+                    title: isRTL ? "تم التغيير" : "Changed",
+                    description: isRTL ? `تم تغيير تنسيق الوقت إلى ${newFormat} ساعة` : `Time format changed to ${newFormat} hours`,
+                  });
+                }}
+                options={[
+                  { value: "24", label: isRTL ? "24 ساعة" : "24 hours" },
+                  { value: "12", label: isRTL ? "12 ساعة" : "12 hours" },
+                ]}
+                onSelect={(value) => {
+                  setTimeFormat(value);
+                  toast({
+                    title: isRTL ? "تم التغيير" : "Changed",
+                    description: isRTL ? `تم تغيير تنسيق الوقت إلى ${value} ساعة` : `Time format changed to ${value} hours`,
+                  });
+                }}
+                isRTL={isRTL}
+                last
+              />
             </div>
           </div>
 
@@ -330,19 +469,6 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Subscription */}
-          <div className="px-4 space-y-2">
-            <h3 className="font-bold text-right text-muted-foreground text-sm">الاشتراك والدفع</h3>
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <div className="flex items-center justify-between">
-                <Button size="sm" variant="outline">ترقية</Button>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">الخطة المجانية</span>
-                  <CreditCard className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="mx-4 space-y-2">
@@ -370,18 +496,96 @@ const Profile = () => {
 };
 
 // Helper components for settings rows
-const SettingRow = ({ icon: Icon, label, value, last }: { icon: any; label: string; value: string; last?: boolean }) => (
+const SettingRow = ({ icon: Icon, label, value, last, isRTL }: { icon: any; label: string; value: string; last?: boolean; isRTL?: boolean }) => (
   <div className={`flex items-center justify-between px-4 py-3 ${!last ? "border-b border-border" : ""}`}>
-    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-      <ChevronIcon />
-      <span>{value}</span>
+    <div className={`flex items-center gap-2 text-sm ${isRTL ? "flex-row-reverse" : ""}`}>
+      <Icon className="w-5 h-5 text-primary" />
+      <span className="font-medium text-foreground">{label}</span>
     </div>
-    <div className="flex items-center gap-3">
-      <span className="text-sm">{label}</span>
-      <Icon className="w-5 h-5 text-muted-foreground" />
+    <div className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <span className="text-sm text-muted-foreground">{value}</span>
     </div>
   </div>
 );
+
+// Clickable setting row with popover for selection
+const ClickableSettingRow = ({ 
+  icon: Icon, 
+  label, 
+  value, 
+  onClick, 
+  onSelect,
+  options,
+  isRTL,
+  last 
+}: { 
+  icon: any; 
+  label: string; 
+  value: string; 
+  onClick?: () => void;
+  onSelect?: (value: string) => void;
+  options?: Array<{ value: string; label: string }>;
+  isRTL: boolean;
+  last?: boolean;
+}) => {
+  if (options && onSelect) {
+    // Find current selected value
+    const currentValue = options.find(opt => value.includes(opt.label.split(" - ")[0]) || value.includes(opt.value))?.value || options[0]?.value;
+    
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className={`w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-all duration-200 ${!last ? "border-b border-border" : ""}`}>
+            <div className={`flex items-center gap-2 text-sm ${isRTL ? "flex-row-reverse" : ""}`}>
+              <Icon className="w-5 h-5 text-primary" />
+              <span className="font-medium text-foreground">{label}</span>
+            </div>
+            <div className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <span className="text-sm text-muted-foreground max-w-[180px] truncate">{value}</span>
+              <ChevronIcon />
+            </div>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className={`w-72 ${isRTL ? "text-right" : "text-left"}`} align={isRTL ? "end" : "start"}>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold mb-3">{label}</p>
+            <Select value={currentValue} onValueChange={(val) => {
+              const option = options.find(opt => opt.value === val);
+              if (option) onSelect(option.value);
+            }}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-primary/5 active:bg-primary/10 transition-all duration-200 ${!last ? "border-b border-border" : ""}`}
+    >
+      <div className={`flex items-center gap-2 text-sm ${isRTL ? "flex-row-reverse" : ""}`}>
+        <Icon className="w-5 h-5 text-primary" />
+        <span className="font-medium text-foreground">{label}</span>
+      </div>
+      <div className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <span className="text-sm text-muted-foreground">{value}</span>
+        <ChevronIcon />
+      </div>
+    </button>
+  );
+};
 
 const ChevronIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

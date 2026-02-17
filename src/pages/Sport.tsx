@@ -1,18 +1,15 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dumbbell, Flame, Scale, Plus, Trash2, Check } from "lucide-react";
+import { Dumbbell, Flame, Scale, Plus, Trash2, Check, X, Circle, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts";
-
-interface SportTask {
-  id: string;
-  name: string;
-  target: number;
-  current: number;
-  icon: string;
-}
+import { useTasks } from "@/contexts/TaskContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import CreateTaskDialog from "@/components/CreateTaskDialog";
+import { format } from "date-fns";
+import { Task } from "@/lib/supabase";
 
 interface WeightEntry {
   date: string;
@@ -20,9 +17,9 @@ interface WeightEntry {
 }
 
 const Sport = () => {
-  const [tasks, setTasks] = useState<SportTask[]>([]);
-  const [newTask, setNewTask] = useState("");
-  const [newTarget, setNewTarget] = useState("");
+  const { tasks, loading, deleteTask, completeTask, uncompleteTask, getTasksForDate } = useTasks();
+  const { isRTL } = useLanguage();
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [calories, setCalories] = useState({ consumed: 0, goal: 2000 });
   const [mealName, setMealName] = useState("");
@@ -38,19 +35,54 @@ const Sport = () => {
   ]);
   const [newWeight, setNewWeight] = useState("");
 
-  const addTask = () => {
-    if (!newTask.trim() || !newTarget) return;
-    setTasks([...tasks, { id: Date.now().toString(), name: newTask, target: parseInt(newTarget), current: 0, icon: "🏋️" }]);
-    setNewTask("");
-    setNewTarget("");
+  // Filter tasks for sport category and current date
+  const sportTasks = useMemo(() => {
+    const todayTasks = getTasksForDate(selectedDate);
+    return todayTasks.filter(task => task.category === 'sport');
+  }, [tasks, selectedDate, getTasksForDate]);
+
+  const todayStr = selectedDate.toISOString().split('T')[0];
+  const completedToday = sportTasks.filter(task => {
+    return task.completed_dates?.includes(todayStr) || false;
+  });
+  const doneCount = completedToday.length;
+  const totalCount = sportTasks.length;
+
+  // Calculate weighted progress based on importance
+  const totalImportance = sportTasks.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const completedImportance = completedToday.reduce((sum, task) => sum + (task.importance || 0), 0);
+  const progressPercentage = totalImportance > 0 ? Math.round((completedImportance / totalImportance) * 100) : 0;
+
+  const handleToggleTask = async (task: Task) => {
+    const isCompleted = task.completed_dates?.includes(todayStr) || false;
+    if (isCompleted) {
+      await uncompleteTask(task.id, todayStr);
+    } else {
+      await completeTask(task.id, todayStr);
+    }
   };
 
-  const incrementTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, current: Math.min(t.current + 1, t.target) } : t));
-  };
-
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
+  const getScheduleInfo = (task: Task) => {
+    if (task.schedule_type === 'daily') {
+      return { icon: Clock, text: isRTL ? "يومي" : "Daily" };
+    } else if (task.schedule_type === 'weekly') {
+      const days = task.weekly_days || [];
+      const dayNames = days.map(d => {
+        const dayMap: { [key: number]: string } = {
+          0: isRTL ? "أحد" : "Sun",
+          1: isRTL ? "إثنين" : "Mon",
+          2: isRTL ? "ثلاثاء" : "Tue",
+          3: isRTL ? "أربعاء" : "Wed",
+          4: isRTL ? "خميس" : "Thu",
+          5: isRTL ? "جمعة" : "Fri",
+          6: isRTL ? "سبت" : "Sat",
+        };
+        return dayMap[d];
+      });
+      return { icon: Calendar, text: dayNames.join(", ") };
+    } else {
+      return { icon: Calendar, text: isRTL ? "مرة واحدة" : "One-time" };
+    }
   };
 
   const addMeal = () => {
@@ -77,13 +109,17 @@ const Sport = () => {
         <div className="flex items-center justify-between">
           <div className="text-left">
             <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full">+XP 0</span>
-            <p className="text-xs text-muted-foreground mt-1">0/5 مكتمل</p>
-            <p className="text-2xl font-bold">0%</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {doneCount}/{totalCount} {isRTL ? "مكتمل" : "completed"}
+            </p>
+            <p className="text-2xl font-bold">
+              {progressPercentage}%
+            </p>
           </div>
           <div className="flex items-center gap-2 text-right">
             <div>
-              <h2 className="text-lg font-bold">الصحة والرياضة</h2>
-              <p className="text-xs text-muted-foreground">اعتنِ بصحتك - أمانة من الله</p>
+              <h2 className="text-lg font-bold">{isRTL ? "الصحة والرياضة" : "Health & Fitness"}</h2>
+              <p className="text-xs text-muted-foreground">{isRTL ? "اعتنِ بصحتك - أمانة من الله" : "Take care of your health - a trust from Allah"}</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
               <Dumbbell className="w-5 h-5 text-white" />
@@ -107,58 +143,95 @@ const Sport = () => {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-3 mt-4">
-          {tasks.map((task) => (
-            <div key={task.id} className="bg-gradient-to-l from-orange-500 to-orange-600 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <button onClick={() => deleteTask(task.id)} className="text-white/60 hover:text-white">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <div className="text-right">
-                  <h3 className="font-bold text-white">{task.name}</h3>
-                  <p className="text-xs text-white/70">هدف يومي {task.target}</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-bold text-white">{task.current}/{task.target}</p>
-                <p className="text-xs text-white/70">اضغط للعد</p>
-              </div>
-              <button
-                onClick={() => incrementTask(task.id)}
-                className="mx-auto block w-14 h-14 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-2xl transition-all active:scale-90"
-              >
-                {task.current >= task.target ? <Check className="w-6 h-6 text-white" /> : task.icon}
-              </button>
-              <div className="flex justify-between text-xs text-white/70">
-                <span>Progress</span>
-                <span>{Math.round((task.current / task.target) * 100)}%</span>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-1.5">
-                <div className="bg-white h-1.5 rounded-full transition-all" style={{ width: `${(task.current / task.target) * 100}%` }} />
-              </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {totalCount} {isRTL ? "مهمة" : "tasks"}
+            </span>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold">{isRTL ? "إكمال المهام اليومية" : "Daily Tasks"}</h3>
+              <span className="text-xs text-muted-foreground">
+                {format(selectedDate, "yyyy-MM-dd")}
+              </span>
             </div>
-          ))}
+          </div>
+
+          {loading ? (
+            <div className="pb-4 flex items-center justify-center min-h-[200px]">
+              <p className="text-muted-foreground">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
+            </div>
+          ) : sportTasks.length === 0 ? (
+            <div className="bg-card rounded-xl p-8 border border-border text-center">
+              <p className="text-muted-foreground mb-4">
+                {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
+              </p>
+              <CreateTaskDialog category="sport" />
+            </div>
+          ) : (
+            <>
+              {sportTasks.map((task) => {
+                const isCompleted = task.completed_dates?.includes(todayStr) || false;
+                const scheduleInfo = getScheduleInfo(task);
+                const ScheduleIcon = scheduleInfo.icon;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="bg-card rounded-xl p-4 border border-border"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <button
+                          onClick={() => handleToggleTask(task)}
+                          className="shrink-0"
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-5 h-5 text-primary" />
+                          ) : (
+                            <Circle className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </button>
+                        <div className="flex-1 text-right">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span
+                              className={`text-sm block flex-1 ${
+                                isCompleted ? "line-through text-muted-foreground" : ""
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+                            {task.importance && (
+                              <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                {task.importance}%
+                              </span>
+                            )}
+                          </div>
+                          {task.description && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {task.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <ScheduleIcon className="w-3 h-3" />
+                            <span>{scheduleInfo.text}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
 
           {/* Add task */}
-          <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
-            <h4 className="font-semibold text-right">إضافة تمرين جديد</h4>
-            <div className="flex gap-2">
-              <Button onClick={addTask} size="sm" className="shrink-0">
-                <Plus className="w-4 h-4" />
-              </Button>
-              <Input
-                value={newTarget}
-                onChange={(e) => setNewTarget(e.target.value)}
-                placeholder="الهدف"
-                type="number"
-                className="w-20 text-right"
-              />
-              <Input
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                placeholder="اسم التمرين..."
-                className="text-right"
-              />
-            </div>
+          <div className="bg-card rounded-xl p-3 border border-border">
+            <CreateTaskDialog category="sport" />
           </div>
         </TabsContent>
 
