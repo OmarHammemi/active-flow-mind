@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark, X, Calendar, Sun, Moon, MoonStar, Heart, Sparkles } from "lucide-react";
+import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark, X, Calendar, Sun, Moon, MoonStar, Heart, Sparkles, Sunrise, Sunset } from "lucide-react";
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
@@ -11,59 +11,137 @@ import EditTaskDialog from "@/components/EditTaskDialog";
 import { format } from "date-fns";
 import { Task } from "@/lib/supabase";
 
-const prayerTimes = [
-  { name: "الفجر", time: "05:30", passed: true },
-  { name: "الشروق", time: "07:05", passed: true },
-  { name: "الظهر", time: "12:45", passed: false, next: true },
-  { name: "العصر", time: "15:50", passed: false },
-  { name: "المغرب", time: "18:20", passed: false },
-  { name: "العشاء", time: "19:50", passed: false },
-];
+// Prayer names in Arabic and English
+const prayerNames = {
+  Fajr: { ar: "الفجر", en: "Fajr" },
+  Sunrise: { ar: "الشروق", en: "Sunrise" },
+  Dhuhr: { ar: "الظهر", en: "Dhuhr" },
+  Asr: { ar: "العصر", en: "Asr" },
+  Maghrib: { ar: "المغرب", en: "Maghrib" },
+  Isha: { ar: "العشاء", en: "Isha" },
+};
 
 
 const hijriMonths = ["محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
 const miladiMonths = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
+// Complete list of all 114 suras with page numbers
 const suraList = [
-  { number: 1, name: "الفاتحة", startPage: 1 },
-  { number: 2, name: "البقرة", startPage: 2 },
-  { number: 3, name: "آل عمران", startPage: 50 },
-  { number: 4, name: "النساء", startPage: 77 },
-  { number: 5, name: "المائدة", startPage: 106 },
-  { number: 6, name: "الأنعام", startPage: 128 },
-  { number: 7, name: "الأعراف", startPage: 151 },
-  { number: 8, name: "الأنفال", startPage: 177 },
-  { number: 9, name: "التوبة", startPage: 187 },
-  { number: 10, name: "يونس", startPage: 208 },
-  { number: 11, name: "هود", startPage: 221 },
-  { number: 12, name: "يوسف", startPage: 235 },
-  { number: 13, name: "الرعد", startPage: 249 },
-  { number: 14, name: "إبراهيم", startPage: 255 },
-  { number: 15, name: "الحجر", startPage: 262 },
-  { number: 16, name: "النحل", startPage: 267 },
-  { number: 17, name: "الإسراء", startPage: 282 },
-  { number: 18, name: "الكهف", startPage: 293 },
-  { number: 19, name: "مريم", startPage: 305 },
-  { number: 20, name: "طه", startPage: 312 },
-  { number: 21, name: "الأنبياء", startPage: 322 },
-  { number: 22, name: "الحج", startPage: 332 },
-  { number: 23, name: "المؤمنون", startPage: 342 },
-  { number: 24, name: "النور", startPage: 350 },
-  { number: 25, name: "الفرقان", startPage: 359 },
-  { number: 26, name: "الشعراء", startPage: 367 },
-  { number: 27, name: "النمل", startPage: 377 },
-  { number: 28, name: "القصص", startPage: 385 },
-  { number: 29, name: "العنكبوت", startPage: 396 },
-  { number: 30, name: "الروم", startPage: 404 },
-  { number: 36, name: "يس", startPage: 440 },
-  { number: 55, name: "الرحمن", startPage: 531 },
-  { number: 56, name: "الواقعة", startPage: 534 },
-  { number: 67, name: "الملك", startPage: 562 },
-  { number: 78, name: "النبأ", startPage: 582 },
-  { number: 112, name: "الإخلاص", startPage: 604 },
-  { number: 113, name: "الفلق", startPage: 604 },
-  { number: 114, name: "الناس", startPage: 604 },
+  { number: 1, name: "الفاتحة", startPage: 1, verses: 7 },
+  { number: 2, name: "البقرة", startPage: 2, verses: 286 },
+  { number: 3, name: "آل عمران", startPage: 50, verses: 200 },
+  { number: 4, name: "النساء", startPage: 77, verses: 176 },
+  { number: 5, name: "المائدة", startPage: 106, verses: 120 },
+  { number: 6, name: "الأنعام", startPage: 128, verses: 165 },
+  { number: 7, name: "الأعراف", startPage: 151, verses: 206 },
+  { number: 8, name: "الأنفال", startPage: 177, verses: 75 },
+  { number: 9, name: "التوبة", startPage: 187, verses: 129 },
+  { number: 10, name: "يونس", startPage: 208, verses: 109 },
+  { number: 11, name: "هود", startPage: 221, verses: 123 },
+  { number: 12, name: "يوسف", startPage: 235, verses: 111 },
+  { number: 13, name: "الرعد", startPage: 249, verses: 43 },
+  { number: 14, name: "إبراهيم", startPage: 255, verses: 52 },
+  { number: 15, name: "الحجر", startPage: 262, verses: 99 },
+  { number: 16, name: "النحل", startPage: 267, verses: 128 },
+  { number: 17, name: "الإسراء", startPage: 282, verses: 111 },
+  { number: 18, name: "الكهف", startPage: 293, verses: 110 },
+  { number: 19, name: "مريم", startPage: 305, verses: 98 },
+  { number: 20, name: "طه", startPage: 312, verses: 135 },
+  { number: 21, name: "الأنبياء", startPage: 322, verses: 112 },
+  { number: 22, name: "الحج", startPage: 332, verses: 78 },
+  { number: 23, name: "المؤمنون", startPage: 342, verses: 118 },
+  { number: 24, name: "النور", startPage: 350, verses: 64 },
+  { number: 25, name: "الفرقان", startPage: 359, verses: 77 },
+  { number: 26, name: "الشعراء", startPage: 367, verses: 227 },
+  { number: 27, name: "النمل", startPage: 377, verses: 93 },
+  { number: 28, name: "القصص", startPage: 385, verses: 88 },
+  { number: 29, name: "العنكبوت", startPage: 396, verses: 69 },
+  { number: 30, name: "الروم", startPage: 404, verses: 60 },
+  { number: 31, name: "لقمان", startPage: 411, verses: 34 },
+  { number: 32, name: "السجدة", startPage: 415, verses: 30 },
+  { number: 33, name: "الأحزاب", startPage: 418, verses: 73 },
+  { number: 34, name: "سبأ", startPage: 428, verses: 54 },
+  { number: 35, name: "فاطر", startPage: 434, verses: 45 },
+  { number: 36, name: "يس", startPage: 440, verses: 83 },
+  { number: 37, name: "الصافات", startPage: 446, verses: 182 },
+  { number: 38, name: "ص", startPage: 453, verses: 88 },
+  { number: 39, name: "الزمر", startPage: 458, verses: 75 },
+  { number: 40, name: "غافر", startPage: 467, verses: 85 },
+  { number: 41, name: "فصلت", startPage: 477, verses: 54 },
+  { number: 42, name: "الشورى", startPage: 483, verses: 53 },
+  { number: 43, name: "الزخرف", startPage: 489, verses: 89 },
+  { number: 44, name: "الدخان", startPage: 496, verses: 59 },
+  { number: 45, name: "الجاثية", startPage: 499, verses: 37 },
+  { number: 46, name: "الأحقاف", startPage: 502, verses: 35 },
+  { number: 47, name: "محمد", startPage: 507, verses: 38 },
+  { number: 48, name: "الفتح", startPage: 511, verses: 29 },
+  { number: 49, name: "الحجرات", startPage: 515, verses: 18 },
+  { number: 50, name: "ق", startPage: 518, verses: 45 },
+  { number: 51, name: "الذاريات", startPage: 520, verses: 60 },
+  { number: 52, name: "الطور", startPage: 523, verses: 49 },
+  { number: 53, name: "النجم", startPage: 526, verses: 62 },
+  { number: 54, name: "القمر", startPage: 528, verses: 55 },
+  { number: 55, name: "الرحمن", startPage: 531, verses: 78 },
+  { number: 56, name: "الواقعة", startPage: 534, verses: 96 },
+  { number: 57, name: "الحديد", startPage: 537, verses: 29 },
+  { number: 58, name: "المجادلة", startPage: 542, verses: 22 },
+  { number: 59, name: "الحشر", startPage: 545, verses: 24 },
+  { number: 60, name: "الممتحنة", startPage: 549, verses: 13 },
+  { number: 61, name: "الصف", startPage: 551, verses: 14 },
+  { number: 62, name: "الجمعة", startPage: 553, verses: 11 },
+  { number: 63, name: "المنافقون", startPage: 554, verses: 11 },
+  { number: 64, name: "التغابن", startPage: 556, verses: 18 },
+  { number: 65, name: "الطلاق", startPage: 558, verses: 12 },
+  { number: 66, name: "التحريم", startPage: 560, verses: 12 },
+  { number: 67, name: "الملك", startPage: 562, verses: 30 },
+  { number: 68, name: "القلم", startPage: 564, verses: 52 },
+  { number: 69, name: "الحاقة", startPage: 566, verses: 52 },
+  { number: 70, name: "المعارج", startPage: 568, verses: 44 },
+  { number: 71, name: "نوح", startPage: 570, verses: 28 },
+  { number: 72, name: "الجن", startPage: 572, verses: 28 },
+  { number: 73, name: "المزمل", startPage: 574, verses: 20 },
+  { number: 74, name: "المدثر", startPage: 575, verses: 56 },
+  { number: 75, name: "القيامة", startPage: 577, verses: 40 },
+  { number: 76, name: "الإنسان", startPage: 578, verses: 31 },
+  { number: 77, name: "المرسلات", startPage: 580, verses: 50 },
+  { number: 78, name: "النبأ", startPage: 582, verses: 40 },
+  { number: 79, name: "النازعات", startPage: 583, verses: 46 },
+  { number: 80, name: "عبس", startPage: 585, verses: 42 },
+  { number: 81, name: "التكوير", startPage: 586, verses: 29 },
+  { number: 82, name: "الانفطار", startPage: 587, verses: 19 },
+  { number: 83, name: "المطففين", startPage: 588, verses: 36 },
+  { number: 84, name: "الانشقاق", startPage: 589, verses: 25 },
+  { number: 85, name: "البروج", startPage: 590, verses: 22 },
+  { number: 86, name: "الطارق", startPage: 591, verses: 17 },
+  { number: 87, name: "الأعلى", startPage: 591, verses: 19 },
+  { number: 88, name: "الغاشية", startPage: 592, verses: 26 },
+  { number: 89, name: "الفجر", startPage: 593, verses: 30 },
+  { number: 90, name: "البلد", startPage: 594, verses: 20 },
+  { number: 91, name: "الشمس", startPage: 595, verses: 15 },
+  { number: 92, name: "الليل", startPage: 595, verses: 21 },
+  { number: 93, name: "الضحى", startPage: 596, verses: 11 },
+  { number: 94, name: "الشرح", startPage: 596, verses: 8 },
+  { number: 95, name: "التين", startPage: 597, verses: 8 },
+  { number: 96, name: "العلق", startPage: 597, verses: 19 },
+  { number: 97, name: "القدر", startPage: 598, verses: 5 },
+  { number: 98, name: "البينة", startPage: 598, verses: 8 },
+  { number: 99, name: "الزلزلة", startPage: 599, verses: 8 },
+  { number: 100, name: "العاديات", startPage: 599, verses: 11 },
+  { number: 101, name: "القارعة", startPage: 600, verses: 11 },
+  { number: 102, name: "التكاثر", startPage: 600, verses: 8 },
+  { number: 103, name: "العصر", startPage: 601, verses: 3 },
+  { number: 104, name: "الهمزة", startPage: 601, verses: 9 },
+  { number: 105, name: "الفيل", startPage: 601, verses: 5 },
+  { number: 106, name: "قريش", startPage: 602, verses: 4 },
+  { number: 107, name: "الماعون", startPage: 602, verses: 7 },
+  { number: 108, name: "الكوثر", startPage: 602, verses: 3 },
+  { number: 109, name: "الكافرون", startPage: 603, verses: 6 },
+  { number: 110, name: "النصر", startPage: 603, verses: 3 },
+  { number: 111, name: "المسد", startPage: 603, verses: 5 },
+  { number: 112, name: "الإخلاص", startPage: 604, verses: 4 },
+  { number: 113, name: "الفلق", startPage: 604, verses: 5 },
+  { number: 114, name: "الناس", startPage: 604, verses: 6 },
 ];
 
 const sampleVerses: Record<number, { sura: string; verses: string[] }> = {
@@ -258,15 +336,47 @@ const Quran = () => {
 
   const getCurrentSura = () => {
     for (let i = suraList.length - 1; i >= 0; i--) {
-      if (currentPage >= suraList[i].startPage) return suraList[i].name;
+      if (currentPage >= suraList[i].startPage) {
+        return suraList[i];
+      }
     }
-    return "الفاتحة";
+    return suraList[0];
   };
 
   const getVerses = () => {
-    if (currentPage <= 1) return sampleVerses[1];
-    if (currentPage <= 49) return sampleVerses[2];
-    return { sura: getCurrentSura(), verses: ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "..."] };
+    const currentSura = getCurrentSura();
+    
+    // Show sample verses for first two suras, otherwise show sura info
+    if (currentPage <= 1) {
+      return { 
+        sura: "الفاتحة", 
+        verses: sampleVerses[1].verses,
+        suraNumber: 1,
+        totalVerses: 7
+      };
+    }
+    if (currentPage <= 49 && currentPage >= 2) {
+      return { 
+        sura: "البقرة", 
+        verses: sampleVerses[2].verses,
+        suraNumber: 2,
+        totalVerses: 286
+      };
+    }
+    
+    // For other pages, show sura information
+    return { 
+      sura: currentSura.name, 
+      verses: [
+        `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ`,
+        `${isRTL ? "سورة" : "Sura"} ${currentSura.name}`,
+        `${isRTL ? "عدد الآيات:" : "Total verses:"} ${currentSura.verses}`,
+        `${isRTL ? "الصفحة" : "Page"} ${currentPage}`,
+        `${isRTL ? "لإظهار الآيات الكاملة، يرجى استخدام مصدر بيانات القرآن الكامل" : "To display full verses, please use a complete Quran data source"}`
+      ],
+      suraNumber: currentSura.number,
+      totalVerses: currentSura.verses
+    };
   };
 
   const handleSuraSelect = (value: string) => {
@@ -283,9 +393,241 @@ const Quran = () => {
     }
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  };
+  // Prayer times state
+  const [prayerTimes, setPrayerTimes] = useState<Array<{
+    name: string;
+    nameEn: string;
+    time: string;
+    timeObj: Date | null;
+    passed: boolean;
+    next: boolean;
+    timeRemaining: string;
+  }>>([]);
+  const [prayerLoading, setPrayerLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userTimezone, setUserTimezone] = useState<string>(() => {
+    return localStorage.getItem("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  });
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update timezone when it changes in localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const tz = localStorage.getItem("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      if (tz !== userTimezone) {
+        setUserTimezone(tz);
+      }
+    };
+    
+    // Check for timezone changes periodically
+    const interval = setInterval(handleStorageChange, 2000);
+    return () => clearInterval(interval);
+  }, [userTimezone]);
+
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+  // Get user location or use default (Cairo as fallback)
+  useEffect(() => {
+    const getLocation = async () => {
+      const savedLocation = localStorage.getItem("user_location");
+      if (savedLocation) {
+        try {
+          const loc = JSON.parse(savedLocation);
+          setUserLocation(loc);
+        } catch {
+          // Default to Cairo if parsing fails
+          setUserLocation({ lat: 30.0444, lng: 31.2357 });
+        }
+      } else {
+        // Try to get from browser geolocation
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const loc = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              setUserLocation(loc);
+              localStorage.setItem("user_location", JSON.stringify(loc));
+            },
+            () => {
+              // Default to Cairo if geolocation fails
+              setUserLocation({ lat: 30.0444, lng: 31.2357 });
+            }
+          );
+        } else {
+          // Default to Cairo
+          setUserLocation({ lat: 30.0444, lng: 31.2357 });
+        }
+      }
+    };
+    getLocation();
+  }, []);
+
+  // Fetch prayer times from Aladhan API
+  useEffect(() => {
+    if (!userLocation) return;
+
+    const fetchPrayerTimes = async () => {
+      setPrayerLoading(true);
+      try {
+        const today = new Date();
+        const dateStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
+        
+        // Use Aladhan API
+        const response = await fetch(
+          `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${userLocation.lat}&longitude=${userLocation.lng}&method=2&timezonestring=${userTimezone}`
+        );
+        
+        if (!response.ok) throw new Error("Failed to fetch prayer times");
+        
+        const data = await response.json();
+        const timings = data.data.timings;
+        const dateForTimings = data.data.date; // API provides date info
+
+        const prayers = [
+          { key: "Fajr", name: prayerNames.Fajr, time: timings.Fajr },
+          { key: "Sunrise", name: prayerNames.Sunrise, time: timings.Sunrise },
+          { key: "Dhuhr", name: prayerNames.Dhuhr, time: timings.Dhuhr },
+          { key: "Asr", name: prayerNames.Asr, time: timings.Asr },
+          { key: "Maghrib", name: prayerNames.Maghrib, time: timings.Maghrib },
+          { key: "Isha", name: prayerNames.Isha, time: timings.Isha },
+        ];
+
+        // Get current time - we'll compare everything in UTC milliseconds
+        const now = new Date();
+        let nextPrayerIndex = -1;
+
+        // Helper function to convert a time in user's timezone to a Date object
+        const createDateInTimezone = (hours: number, minutes: number, timezone: string): Date => {
+          // Get current date in the specified timezone
+          const nowInTz = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+          const year = nowInTz.getFullYear();
+          const month = nowInTz.getMonth();
+          const day = nowInTz.getDate();
+          
+          // Create date string in ISO format
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+          
+          // Create a date object - this will be in browser's local timezone
+          const localDate = new Date(dateStr);
+          
+          // Calculate the offset between browser timezone and target timezone
+          // Get what the current time would be in the target timezone
+          const nowInTargetTz = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+          const nowInBrowserTz = new Date(now.toLocaleString("en-US"));
+          
+          // Calculate offset in milliseconds
+          const offsetMs = nowInBrowserTz.getTime() - nowInTargetTz.getTime();
+          
+          // Adjust the date to account for timezone difference
+          return new Date(localDate.getTime() + offsetMs);
+        };
+
+        // Process prayer times - API returns times in the specified timezone
+        const processedPrayers = prayers.map((prayer, index) => {
+          const [hours, minutes] = prayer.time.split(":").map(Number);
+          
+          // Create prayer time date in user's timezone
+          let prayerTime = createDateInTimezone(hours, minutes, userTimezone);
+          
+          // If prayer time has passed today, set it for tomorrow
+          if (prayerTime < now) {
+            prayerTime = new Date(prayerTime);
+            prayerTime.setDate(prayerTime.getDate() + 1);
+          }
+
+          const passed = prayerTime < now;
+          const isNext = !passed && (nextPrayerIndex === -1 || prayerTime < prayers[nextPrayerIndex >= 0 ? nextPrayerIndex : index].time);
+
+          if (isNext) {
+            nextPrayerIndex = index;
+          }
+
+          return {
+            name: isRTL ? prayer.name.ar : prayer.name.en,
+            nameEn: prayer.name.en,
+            time: prayer.time,
+            timeObj: prayerTime,
+            passed,
+            next: isNext,
+            timeRemaining: "",
+          };
+        });
+
+        // Mark all as not next except the actual next one
+        const finalPrayers = processedPrayers.map((p, i) => ({
+          ...p,
+          next: i === nextPrayerIndex,
+        }));
+
+        setPrayerTimes(finalPrayers);
+      } catch (error) {
+        console.error("Error fetching prayer times:", error);
+        // Fallback to default times
+        const now = new Date();
+        const defaultPrayers = [
+          { name: isRTL ? "الفجر" : "Fajr", nameEn: "Fajr", time: "05:30", timeObj: null, passed: true, next: false, timeRemaining: "" },
+          { name: isRTL ? "الشروق" : "Sunrise", nameEn: "Sunrise", time: "07:05", timeObj: null, passed: true, next: false, timeRemaining: "" },
+          { name: isRTL ? "الظهر" : "Dhuhr", nameEn: "Dhuhr", time: "12:45", timeObj: null, passed: false, next: true, timeRemaining: "" },
+          { name: isRTL ? "العصر" : "Asr", nameEn: "Asr", time: "15:50", timeObj: null, passed: false, next: false, timeRemaining: "" },
+          { name: isRTL ? "المغرب" : "Maghrib", nameEn: "Maghrib", time: "18:20", timeObj: null, passed: false, next: false, timeRemaining: "" },
+          { name: isRTL ? "العشاء" : "Isha", nameEn: "Isha", time: "19:50", timeObj: null, passed: false, next: false, timeRemaining: "" },
+        ];
+        setPrayerTimes(defaultPrayers);
+      } finally {
+        setPrayerLoading(false);
+      }
+    };
+
+    fetchPrayerTimes();
+    
+    // Refresh every minute
+    const interval = setInterval(fetchPrayerTimes, 60000);
+    return () => clearInterval(interval);
+  }, [userLocation, userTimezone, isRTL]);
+
+  // Calculate time remaining for each prayer
+  useEffect(() => {
+    const updateCountdowns = () => {
+      const now = new Date();
+      setPrayerTimes(prev => prev.map(prayer => {
+        if (!prayer.timeObj || prayer.passed) {
+          return { ...prayer, timeRemaining: "" };
+        }
+
+        const diff = prayer.timeObj.getTime() - now.getTime();
+        if (diff <= 0) {
+          return { ...prayer, passed: true, next: false, timeRemaining: "" };
+        }
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let timeRemaining = "";
+        if (hours > 0) {
+          timeRemaining = isRTL ? `${hours}س ${minutes}د` : `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+          timeRemaining = isRTL ? `${minutes}د ${seconds}ث` : `${minutes}m ${seconds}s`;
+        } else {
+          timeRemaining = isRTL ? `${seconds}ث` : `${seconds}s`;
+        }
+
+        return { ...prayer, timeRemaining };
+      }));
+    };
+
+    updateCountdowns();
+    const interval = setInterval(updateCountdowns, 1000);
+    return () => clearInterval(interval);
+  }, [isRTL]);
 
   const hijri = toHijri(currentDate);
   const nextPrayer = prayerTimes.find(p => p.next);
@@ -347,33 +689,320 @@ const Quran = () => {
         </TabsList>
 
         {/* Prayer Times */}
-        <TabsContent value="prayer" className="space-y-3 mt-4">
-          <h3 className="font-bold text-right">مواقيت الصلاة</h3>
-          {nextPrayer && (
-            <div className="bg-card rounded-2xl p-4 border border-primary/30 border-2">
+        <TabsContent value="prayer" className="space-y-4 mt-4">
               <div className="flex items-center justify-between">
-                <div className="text-left">
-                  <span className="text-2xl font-bold text-primary">{nextPrayer.time}</span>
-                  <p className="text-xs text-muted-foreground">باقي ٢ ساعة</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem("user_location");
+                window.location.reload();
+              }}
+              className="text-xs text-muted-foreground"
+            >
+              {isRTL ? "تحديث الموقع" : "Refresh Location"}
+            </Button>
+            <div className="text-right">
+              <h3 className="font-bold text-lg">{isRTL ? "مواقيت الصلاة" : "Prayer Times"}</h3>
+              {userLocation && (
+                <p className="text-[10px] text-muted-foreground">
+                  {userTimezone.replace(/_/g, " ")}
+                </p>
+              )}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">الصلاة القادمة</p>
-                  <p className="text-xl font-bold">{nextPrayer.name}</p>
                 </div>
+          
+          {prayerLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">{isRTL ? "جاري تحميل مواقيت الصلاة..." : "Loading prayer times..."}</p>
               </div>
             </div>
-          )}
-          <div className="bg-card rounded-2xl border border-border overflow-hidden">
-            {prayerTimes.map((prayer, i) => (
-              <div key={i} className={`flex items-center justify-between px-4 py-3 border-b border-border last:border-0 ${prayer.next ? "bg-primary/10" : ""}`}>
-                <span className={`font-semibold ${prayer.next ? "text-primary" : ""}`}>{prayer.time}</span>
-                <div className="flex items-center gap-2">
-                  <span className={prayer.next ? "font-bold" : ""}>{prayer.name}</span>
-                  <span className={`w-2 h-2 rounded-full ${prayer.passed ? "bg-primary" : prayer.next ? "bg-primary animate-pulse" : "bg-muted-foreground/30"}`} />
+          ) : (
+            <>
+              {/* Large Timer Display */}
+              <div className="bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 rounded-3xl p-6 border-2 border-primary/40 shadow-2xl">
+                <div className="text-center space-y-4">
+                  {/* Current Time - Large Display */}
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground font-semibold">{isRTL ? "الوقت الحالي" : "Current Time"}</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <Clock className="w-6 h-6 text-primary animate-pulse" />
+                      <p className="text-5xl font-bold text-primary tabular-nums">
+                        {currentTime.toLocaleTimeString(isRTL ? "ar-EG" : "en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          timeZone: userTimezone,
+                          hour12: localStorage.getItem("timeFormat") === "12"
+                        })}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {userTimezone.replace(/_/g, " ")}
+                    </p>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-primary/20 my-4"></div>
+
+                  {/* Next Prayer Countdown */}
+                  {nextPrayer ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground font-semibold">{isRTL ? "الصلاة القادمة" : "Next Prayer"}</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
+                          <Clock className="w-8 h-8 text-primary animate-pulse" />
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
+                          <p className="text-lg text-muted-foreground">
+                            {(() => {
+                              const [hours, minutes] = nextPrayer.time.split(":").map(Number);
+                              const timeFormat = localStorage.getItem("timeFormat") || "24";
+                              if (timeFormat === "12") {
+                                const period = hours >= 12 ? "PM" : "AM";
+                                const displayHours = hours % 12 || 12;
+                                return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+                              }
+                              return nextPrayer.time;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                      {nextPrayer.timeRemaining ? (
+                        <div className="mt-4">
+                          <p className="text-xs text-muted-foreground mb-3">{isRTL ? "الوقت المتبقي" : "Time Remaining"}</p>
+                          <div className="bg-background/50 rounded-2xl p-4 border border-primary/30">
+                            {(() => {
+                              // Parse the timeRemaining string to extract hours, minutes, seconds
+                              const timeStr = nextPrayer.timeRemaining;
+                              let hours = 0, minutes = 0, seconds = 0;
+                              
+                              if (isRTL) {
+                                // Arabic format: "2س 30د 45ث" or "30د 45ث" or "45ث"
+                                const hourMatch = timeStr.match(/(\d+)س/);
+                                const minMatch = timeStr.match(/(\d+)د/);
+                                const secMatch = timeStr.match(/(\d+)ث/);
+                                hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+                                minutes = minMatch ? parseInt(minMatch[1]) : 0;
+                                seconds = secMatch ? parseInt(secMatch[1]) : 0;
+                              } else {
+                                // English format: "2h 30m 45s" or "30m 45s" or "45s"
+                                const hourMatch = timeStr.match(/(\d+)h/);
+                                const minMatch = timeStr.match(/(\d+)m/);
+                                const secMatch = timeStr.match(/(\d+)s/);
+                                hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+                                minutes = minMatch ? parseInt(minMatch[1]) : 0;
+                                seconds = secMatch ? parseInt(secMatch[1]) : 0;
+                              }
+                              
+                              return (
+                                <div className="flex items-center justify-center gap-3">
+                                  {hours > 0 && (
+                                    <div className="flex flex-col items-center">
+                                      <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
+                                        <p className="text-3xl font-bold text-primary tabular-nums">{String(hours).padStart(2, '0')}</p>
+                                      </div>
+                                      <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "ساعة" : "Hours"}</p>
+                                    </div>
+                                  )}
+                                  {hours > 0 && <span className="text-2xl font-bold text-primary">:</span>}
+                                  <div className="flex flex-col items-center">
+                                    <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
+                                      <p className="text-3xl font-bold text-primary tabular-nums">{String(minutes).padStart(2, '0')}</p>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "دقيقة" : "Minutes"}</p>
+                                  </div>
+                                  <span className="text-2xl font-bold text-primary">:</span>
+                                  <div className="flex flex-col items-center">
+                                    <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
+                                      <p className="text-3xl font-bold text-primary tabular-nums animate-pulse">{String(seconds).padStart(2, '0')}</p>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "ثانية" : "Seconds"}</p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <p className="text-sm text-muted-foreground">{isRTL ? "جاري الحساب..." : "Calculating..."}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">{isRTL ? "لا توجد صلاة قادمة" : "No upcoming prayer"}</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Next Prayer Highlight Card */}
+              {nextPrayer && (() => {
+                const [hours, minutes] = nextPrayer.time.split(":").map(Number);
+                const timeFormat = localStorage.getItem("timeFormat") || "24";
+                let displayTime = nextPrayer.time;
+                if (timeFormat === "12") {
+                  const period = hours >= 12 ? "PM" : "AM";
+                  const displayHours = hours % 12 || 12;
+                  displayTime = `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+                }
+                return (
+                  <div className="bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl p-5 border-2 border-primary/30 shadow-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الصلاة القادمة" : "Next Prayer"}</p>
+                        <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
+                      </div>
+                      <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center relative">
+                        <Clock className="w-8 h-8 text-primary animate-pulse" />
+                        {nextPrayer.timeRemaining && (
+                          <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            {nextPrayer.timeRemaining}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-left">
+                        <span className="text-4xl font-bold text-primary">{displayTime}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">{isRTL ? "باقي" : "Time remaining"}</p>
+                        <p className="text-lg font-semibold">{nextPrayer.timeRemaining || (isRTL ? "جاري الحساب..." : "Calculating...")}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Prayer Times Grid with Clocks */}
+              <div className="grid grid-cols-2 gap-3">
+                {prayerTimes.map((prayer, i) => {
+                  const prayerIcons: Record<string, any> = {
+                    "Fajr": Sunrise,
+                    "Sunrise": Sun,
+                    "Dhuhr": Sun,
+                    "Asr": Sun,
+                    "Maghrib": Sunset,
+                    "Isha": Moon,
+                  };
+                  const Icon = prayerIcons[prayer.nameEn] || Clock;
+                  
+                  // Format time for display
+                  const [hours, minutes] = prayer.time.split(":").map(Number);
+                  const timeFormat = localStorage.getItem("timeFormat") || "24";
+                  let displayTime = prayer.time;
+                  if (timeFormat === "12") {
+                    const period = hours >= 12 ? "PM" : "AM";
+                    const displayHours = hours % 12 || 12;
+                    displayTime = `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+                  }
+                  
+                  return (
+                    <div
+                      key={i}
+                      className={`bg-card rounded-2xl p-4 border-2 transition-all ${
+                        prayer.next
+                          ? "border-primary/50 bg-primary/10 shadow-lg scale-[1.02]"
+                          : prayer.passed
+                          ? "border-border/50 bg-muted/30 opacity-75"
+                          : "border-border hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center relative border-2 ${
+                          prayer.next
+                            ? "bg-primary/20 border-primary"
+                            : prayer.passed
+                            ? "bg-muted border-muted-foreground/30"
+                            : "bg-primary/10 border-primary/30"
+                        }`}>
+                          <Icon className={`w-6 h-6 ${
+                            prayer.next
+                              ? "text-primary"
+                              : prayer.passed
+                              ? "text-muted-foreground"
+                              : "text-primary/70"
+                          }`} />
+                          {prayer.next && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse border-2 border-background"></div>
+                          )}
+                        </div>
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          prayer.passed
+                            ? "bg-primary"
+                            : prayer.next
+                            ? "bg-primary animate-pulse"
+                            : "bg-muted-foreground/30"
+                        }`} />
+                      </div>
+                      <div className="text-right space-y-2">
+                        <p className={`text-sm font-semibold ${
+                          prayer.next ? "text-primary" : prayer.passed ? "text-muted-foreground" : ""
+                        }`}>
+                          {prayer.name}
+                        </p>
+                        {/* Clock Display */}
+                        <div className={`flex items-center justify-end gap-2 ${
+                          prayer.next ? "text-primary" : prayer.passed ? "text-muted-foreground" : ""
+                        }`}>
+                          <div className="relative">
+                            <Clock className={`w-5 h-5 ${
+                              prayer.next ? "text-primary animate-pulse" : prayer.passed ? "text-muted-foreground" : "text-primary/70"
+                            }`} />
+                          </div>
+                          <div>
+                            <p className={`text-2xl font-bold leading-none ${
+                              prayer.next ? "text-primary" : prayer.passed ? "text-muted-foreground line-through" : ""
+                            }`}>
+                              {displayTime}
+                            </p>
+                            {prayer.timeRemaining && !prayer.passed && (
+                              <p className="text-[10px] font-semibold text-primary mt-0.5">
+                                {prayer.timeRemaining}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {prayer.passed && (
+                          <p className="text-[10px] text-muted-foreground">{isRTL ? "مضت" : "Passed"}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Current Time Display */}
+              <div className="bg-card rounded-2xl p-4 border border-border">
+                <div className="flex items-center justify-between">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الوقت الحالي" : "Current Time"}</p>
+                    <p className="text-xl font-bold">
+                      {currentTime.toLocaleTimeString(isRTL ? "ar-EG" : "en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        timeZone: userTimezone,
+                        hour12: localStorage.getItem("timeFormat") === "12"
+                      })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {userTimezone.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* Quran Reader */}
@@ -433,35 +1062,67 @@ const Quran = () => {
           <div className="bg-card rounded-2xl p-5 border border-border text-center space-y-4">
             <div className="flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
-                <Bookmark className="w-4 h-4 ml-1" /> حفظ
+                <Bookmark className="w-4 h-4 ml-1" /> {isRTL ? "حفظ" : "Bookmark"}
               </Button>
               <div>
-                <h3 className="text-xl font-bold">سورة {currentVerses.sura}</h3>
-                <p className="text-xs text-muted-foreground">صفحة {currentPage}</p>
+                <h3 className="text-xl font-bold">
+                  {isRTL ? "سورة" : "Sura"} {currentVerses.sura}
+                  {currentVerses.suraNumber && (
+                    <span className="text-sm text-muted-foreground mr-2">
+                      ({currentVerses.suraNumber})
+                    </span>
+                  )}
+                </h3>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {isRTL ? "صفحة" : "Page"} {currentPage} / 604
+                  </p>
+                  {currentVerses.totalVerses && (
+                    <>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">
+                        {isRTL ? "آيات" : "Verses"}: {currentVerses.totalVerses}
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="bg-muted/50 rounded-xl p-6 space-y-4 text-lg leading-loose" style={{ fontFamily: "'Traditional Arabic', serif" }}>
+            <div className="bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl p-6 space-y-4 text-lg leading-loose min-h-[300px] flex flex-col justify-center" style={{ fontFamily: "'Traditional Arabic', serif" }}>
               {currentVerses.verses.map((v, i) => (
-                <p key={i}>{v}</p>
+                <p key={i} className={i === 0 ? "text-2xl font-bold text-primary mb-4" : i === 1 ? "text-xl font-semibold mb-3" : "text-base"}>
+                  {v}
+                </p>
               ))}
             </div>
             <div className="flex items-center justify-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => Math.min(604, p + 1))}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
               >
-                ← السابق
+                <ChevronRight className="w-4 h-4 ml-1" />
+                {isRTL ? "السابق" : "Previous"}
               </Button>
+              <div className="flex flex-col items-center gap-1">
               <span className="text-sm text-muted-foreground font-semibold">
                 {currentPage} / 604
               </span>
+                {currentVerses.suraNumber && (
+                  <span className="text-xs text-muted-foreground">
+                    {isRTL ? "سورة" : "Sura"} {currentVerses.suraNumber}
+                  </span>
+                )}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage(p => Math.min(604, p + 1))}
+                disabled={currentPage === 604}
               >
-                التالي →
+                {isRTL ? "التالي" : "Next"}
+                <ChevronLeft className="w-4 h-4 mr-1" />
               </Button>
             </div>
           </div>
@@ -697,9 +1358,9 @@ const Quran = () => {
                           className="text-muted-foreground hover:text-destructive shrink-0"
                         >
                           <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                </button>
+              </div>
+            </div>
                   </div>
                 );
               })}

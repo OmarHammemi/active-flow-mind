@@ -425,16 +425,16 @@ const Landing = () => {
                 >
                   <Link to={feature.path || "/dashboard"}>
                     <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50 hover:border-primary/30 transition-all duration-300 group cursor-pointer">
-                      <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Icon className="w-7 h-7 text-primary" />
-                      </div>
-                      <h3 className={`font-bold text-foreground mb-2 ${isRTL ? "font-arabic" : ""}`}>
-                        {feature.title}
-                      </h3>
-                      <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                        {feature.description}
-                      </p>
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Icon className="w-7 h-7 text-primary" />
                     </div>
+                    <h3 className={`font-bold text-foreground mb-2 ${isRTL ? "font-arabic" : ""}`}>
+                      {feature.title}
+                    </h3>
+                    <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                      {feature.description}
+                    </p>
+                  </div>
                   </Link>
                 </motion.div>
               );

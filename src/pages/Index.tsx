@@ -75,12 +75,7 @@ const Index = () => {
     task.completed_dates?.includes(todayStr) || false
   );
 
-  // Calculate overall progress
-  const totalImportance = todayTasks.reduce((sum, task) => sum + (task.importance || 0), 0);
-  const completedImportance = completedToday.reduce((sum, task) => sum + (task.importance || 0), 0);
-  const overallProgress = totalImportance > 0 ? Math.round((completedImportance / totalImportance) * 100) : 0;
-
-  // Calculate section statistics
+  // Calculate section statistics first (needed for weighted progress)
   const sections = useMemo(() => {
     const categories = [
       { name: "العمل والإنتاجية", icon: Briefcase, color: "bg-blue-500", category: "work" as const, path: "/work" },
@@ -119,6 +114,17 @@ const Index = () => {
       };
     });
   }, [todayTasks, todayStr, targetImportance]);
+
+  // Calculate overall progress using weighted percentages
+  // Each category's progress is multiplied by its target importance percentage
+  const overallProgress = useMemo(() => {
+    let weightedSum = 0;
+    sections.forEach(section => {
+      // Multiply category progress by its target importance percentage
+      weightedSum += (section.progress / 100) * (section.target / 100) * 100;
+    });
+    return Math.round(weightedSum);
+  }, [sections]);
 
   // Generate weekly data from actual task completions
   const weekData = useMemo(() => {
@@ -314,7 +320,7 @@ const Index = () => {
               </div>
             </DialogContent>
           </Dialog>
-          <h3 className="text-lg font-bold text-right">رحلاتك</h3>
+        <h3 className="text-lg font-bold text-right">رحلاتك</h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {sections.map((section) => {

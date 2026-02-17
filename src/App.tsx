@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { TaskProvider } from "./contexts/TaskContext";
@@ -20,6 +20,20 @@ import SignUp from "./pages/SignUp";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
+// Layout wrapper that forces remount on route change
+const AppLayout = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="max-w-lg mx-auto min-h-screen bg-background relative">
+      <AppHeader />
+      <main className="pb-20">
+        {children}
+      </main>
+      <BottomNav />
+    </div>
+  );
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -27,9 +41,9 @@ const App = () => (
     <LanguageProvider>
       <AuthProvider>
         <TaskProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
             <BrowserRouter
               future={{
                 v7_startTransition: true,
@@ -47,79 +61,55 @@ const App = () => (
                 <Route
                   path="/dashboard"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Index />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Index />
+                    </AppLayout>
                   }
                 />
                 <Route
                   path="/quran"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Quran />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Quran />
+                    </AppLayout>
                   }
                 />
                 <Route
                   path="/work"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Work />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Work />
+                    </AppLayout>
                   }
                 />
                 <Route
                   path="/sport"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Sport />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Sport />
+                    </AppLayout>
                   }
                 />
                 <Route
                   path="/knowledge"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Knowledge />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Knowledge />
+                    </AppLayout>
                   }
                 />
                 <Route
                   path="/profile"
                   element={
-                    <div className="max-w-lg mx-auto min-h-screen bg-background relative">
-                      <AppHeader />
-                      <main className="pb-20">
-                        <Profile />
-                      </main>
-                      <BottomNav />
-                    </div>
+                    <AppLayout>
+                      <Profile />
+                    </AppLayout>
                   }
                 />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
+      </BrowserRouter>
+    </TooltipProvider>
         </TaskProvider>
       </AuthProvider>
     </LanguageProvider>

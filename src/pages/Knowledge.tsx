@@ -219,11 +219,11 @@ const Knowledge = () => {
                           onClick={() => deleteTask(task.id)}
                           className="text-muted-foreground hover:text-destructive shrink-0"
                         >
-                          <X className="w-4 h-4" />
-                        </button>
+                <X className="w-4 h-4" />
+              </button>
                       </div>
-                    </div>
-                  </div>
+              </div>
+            </div>
                 );
               })}
             </>

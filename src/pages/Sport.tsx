@@ -234,7 +234,7 @@ const Sport = () => {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-3 mt-4">
-          <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {totalCount} {isRTL ? "مهمة" : "tasks"}
             </span>
@@ -280,7 +280,7 @@ const Sport = () => {
                           ) : (
                             <Circle className="w-5 h-5 text-muted-foreground" />
                           )}
-                        </button>
+                </button>
                         <div className="flex-1 text-right">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span
@@ -304,20 +304,20 @@ const Sport = () => {
                           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <ScheduleIcon className="w-3 h-3" />
                             <span>{scheduleInfo.text}</span>
-                          </div>
-                        </div>
-                      </div>
+                </div>
+              </div>
+              </div>
                       <div className="flex items-center gap-1">
                         <EditTaskDialog task={task} />
-                        <button
+              <button
                           onClick={() => deleteTask(task.id)}
                           className="text-muted-foreground hover:text-destructive shrink-0"
-                        >
+              >
                           <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              </button>
+              </div>
+              </div>
+            </div>
                 );
               })}
             </>
@@ -395,11 +395,11 @@ const Sport = () => {
             
             {filteredWeightEntries.length > 0 ? (
               <div className="flex items-center justify-between mb-3">
-                <div>
+              <div>
                   <span className="text-2xl font-bold text-primary">
                     {filteredWeightEntries[filteredWeightEntries.length - 1]?.weight || 0}
                   </span>
-                  <span className="text-sm text-muted-foreground mr-1">كغ</span>
+                <span className="text-sm text-muted-foreground mr-1">كغ</span>
                 </div>
                 {filteredWeightEntries.length > 1 && (
                   <div className="text-right">
@@ -424,22 +424,22 @@ const Sport = () => {
                 <p className="text-xs text-muted-foreground">
                   {isRTL ? "أضف وزنك لبدء التتبع" : "Add your weight to start tracking"}
                 </p>
-              </div>
+            </div>
             )}
 
             {filteredWeightEntries.length > 0 && (
-              <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={filteredWeightEntries.map(entry => ({
                   date: formatWeightDate(entry.date),
                   weight: entry.weight,
                   fullDate: entry.date
                 }))}>
-                  <defs>
-                    <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(160,84%,44%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(160,84%,44%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <defs>
+                  <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(160,84%,44%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(160,84%,44%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                   <XAxis 
                     dataKey="date" 
                     tick={{ fill: "hsl(220,10%,55%)", fontSize: 10 }} 
@@ -469,8 +469,8 @@ const Sport = () => {
                     strokeWidth={2} 
                     dot={{ r: 4, fill: "hsl(160,84%,44%)" }} 
                   />
-                </AreaChart>
-              </ResponsiveContainer>
+              </AreaChart>
+            </ResponsiveContainer>
             )}
           </div>
 
@@ -495,15 +495,15 @@ const Sport = () => {
 
           {/* Weight history */}
           {filteredWeightEntries.length > 0 && (
-            <div className="bg-card rounded-2xl p-4 border border-border space-y-2">
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-2">
               <h4 className="font-semibold text-right">{isRTL ? "السجل" : "History"}</h4>
               {[...filteredWeightEntries].reverse().map((entry, i) => (
-                <div key={i} className="flex justify-between items-center py-2 border-b border-border last:border-0">
-                  <span className="text-sm font-semibold">{entry.weight} كغ</span>
+              <div key={i} className="flex justify-between items-center py-2 border-b border-border last:border-0">
+                <span className="text-sm font-semibold">{entry.weight} كغ</span>
                   <span className="text-sm text-muted-foreground">{formatWeightDate(entry.date)}</span>
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           )}
         </TabsContent>
       </Tabs>

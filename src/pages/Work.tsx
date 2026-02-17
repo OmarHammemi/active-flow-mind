@@ -117,7 +117,7 @@ const Work = () => {
               {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
             </p>
             <CreateTaskDialog category="work" />
-          </div>
+            </div>
         ) : (
           <>
             {workTasks.map((task) => {
@@ -137,11 +137,11 @@ const Work = () => {
                         className="shrink-0"
                       >
                         {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Circle className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </button>
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                ) : (
+                  <Circle className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
                         <div className="flex-1 text-right">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span
@@ -177,8 +177,8 @@ const Work = () => {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                </div>
+            </div>
+          </div>
               );
             })}
           </>
