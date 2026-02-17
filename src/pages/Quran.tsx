@@ -3,10 +3,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark, X, Calendar } from "lucide-react";
+import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark, X, Calendar, Sun, Moon, MoonStar, Heart, Sparkles } from "lucide-react";
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
+import EditTaskDialog from "@/components/EditTaskDialog";
 import { format } from "date-fns";
 import { Task } from "@/lib/supabase";
 
@@ -70,6 +71,65 @@ const sampleVerses: Record<number, { sura: string; verses: string[] }> = {
   2: { sura: "البقرة", verses: ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ الم ﴿١﴾", "ذَٰلِكَ الْكِتَابُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِلْمُتَّقِينَ ﴿٢﴾", "الَّذِينَ يُؤْمِنُونَ بِالْغَيْبِ وَيُقِيمُونَ الصَّلَاةَ وَمِمَّا رَزَقْنَاهُمْ يُنْفِقُونَ ﴿٣﴾"] },
 };
 
+// Adhkar data
+const adhkarData = {
+  morning: {
+    title: "أذكار الصباح",
+    icon: "Sun",
+    items: [
+      { id: "morning1", text: "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ", count: 1, transliteration: "Asbahna wa asbahal-mulku lillah, wal-hamdu lillah" },
+      { id: "morning2", text: "اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ", count: 1, transliteration: "Allahumma bika asbahna, wa bika amsayna, wa bika nahya, wa bika namutu, wa ilaykan-nushur" },
+      { id: "morning3", text: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ", count: 100, transliteration: "Subhanallahi wa bihamdihi" },
+      { id: "morning4", text: "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ", count: 10, transliteration: "La ilaha illallahu wahdahu la sharika lah, lahul-mulku wa lahul-hamdu wa huwa ala kulli shay'in qadir" },
+      { id: "morning5", text: "اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي", count: 3, transliteration: "Allahumma afini fi badani, Allahumma afini fi sam'i, Allahumma afini fi basari" },
+    ]
+  },
+  evening: {
+    title: "أذكار المساء",
+    icon: "Moon",
+    items: [
+      { id: "evening1", text: "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ", count: 1, transliteration: "Amsayna wa amsal-mulku lillah, wal-hamdu lillah" },
+      { id: "evening2", text: "اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ", count: 1, transliteration: "Allahumma bika amsayna, wa bika asbahna, wa bika nahya, wa bika namutu, wa ilaykal-masir" },
+      { id: "evening3", text: "آمَنَّا بِرَبِّنَا وَرَبِّ الْعَالَمِينَ", count: 7, transliteration: "Aamanna birabbina wa rabbil-alamin" },
+      { id: "evening4", text: "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ", count: 1, transliteration: "Allahumma inni as'alukal-afwa wal-afiyah fid-dunya wal-akhirah" },
+      { id: "evening5", text: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ وَرِضَا نَفْسِهِ وَزِنَةَ عَرْشِهِ وَمِدَادَ كَلِمَاتِهِ", count: 3, transliteration: "Subhanallahi wa bihamdihi, adada khalqihi wa rida nafsihi wa zinata arshihi wa midada kalimatihi" },
+    ]
+  },
+  beforeSleep: {
+    title: "أذكار قبل النوم",
+    icon: "MoonStar",
+    items: [
+      { id: "sleep1", text: "بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا", count: 1, transliteration: "Bismikallhumma amutu wa ahya" },
+      { id: "sleep2", text: "اللَّهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ", count: 3, transliteration: "Allahumma qini adhabaka yawma tab'athu ibadak" },
+      { id: "sleep3", text: "اللَّهُمَّ أَسْلَمْتُ نَفْسِي إِلَيْكَ، وَفَوَّضْتُ أَمْرِي إِلَيْكَ، وَوَجَّهْتُ وَجْهِي إِلَيْكَ", count: 1, transliteration: "Allahumma aslamtu nafsi ilayk, wa fawwadtu amri ilayk, wa wajjahtu wajhi ilayk" },
+      { id: "sleep4", text: "آمَنَ الرَّسُولُ بِمَا أُنْزِلَ إِلَيْهِ مِنْ رَبِّهِ وَالْمُؤْمِنُونَ", count: 1, transliteration: "Amana ar-rasulu bima unzila ilayhi min rabbihi wal-mu'minun" },
+      { id: "sleep5", text: "اللَّهُمَّ إِنَّكَ خَلَقْتَ نَفْسِي وَأَنْتَ تَوَفَّاهَا، لَكَ مَمَاتُهَا وَمَحْيَاهَا", count: 1, transliteration: "Allahumma innaka khalaqta nafsi wa anta tawaffaha, laka mamatuha wa mahyaha" },
+    ]
+  },
+  afterPrayer: {
+    title: "أذكار بعد الصلاة",
+    icon: "Heart",
+    items: [
+      { id: "prayer1", text: "أَسْتَغْفِرُ اللَّهَ", count: 3, transliteration: "Astaghfirullah" },
+      { id: "prayer2", text: "اللَّهُمَّ أَنْتَ السَّلَامُ وَمِنْكَ السَّلَامُ، تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالْإِكْرَامِ", count: 1, transliteration: "Allahumma antas-salam wa minkas-salam, tabarakta ya dhal-jalali wal-ikram" },
+      { id: "prayer3", text: "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ", count: 33, transliteration: "La ilaha illallahu wahdahu la sharika lah, lahul-mulku wa lahul-hamdu wa huwa ala kulli shay'in qadir" },
+      { id: "prayer4", text: "سُبْحَانَ اللَّهِ", count: 33, transliteration: "Subhanallah" },
+      { id: "prayer5", text: "الْحَمْدُ لِلَّهِ", count: 33, transliteration: "Alhamdulillah" },
+    ]
+  },
+  general: {
+    title: "أذكار عامة",
+    icon: "Sparkles",
+    items: [
+      { id: "general1", text: "سُبْحَانَ اللَّهِ وَالْحَمْدُ لِلَّهِ وَلَا إِلَهَ إِلَّا اللَّهُ وَاللَّهُ أَكْبَرُ", count: 10, transliteration: "Subhanallahi wal-hamdu lillahi wa la ilaha illallahu wallahu akbar" },
+      { id: "general2", text: "لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ", count: 100, transliteration: "La hawla wa la quwwata illa billah" },
+      { id: "general3", text: "اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ", count: 10, transliteration: "Allahumma salli wa sallim ala nabiyyina Muhammad" },
+      { id: "general4", text: "رَبِّ اغْفِرْ لِي وَتُبْ عَلَيَّ إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ", count: 100, transliteration: "Rabbi ighfir li wa tub alayya innaka antat-tawwabur-rahim" },
+      { id: "general5", text: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ", count: 100, transliteration: "Subhanallahi wa bihamdihi, subhanallahil-azim" },
+    ]
+  }
+};
+
 function toHijri(date: Date) {
   const jd = Math.floor((date.getTime() / 86400000) + 2440587.5);
   const l = jd - 1948440 + 10632;
@@ -89,6 +149,38 @@ const Quran = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarType, setCalendarType] = useState<"hijri" | "miladi">("hijri");
   const [currentDate] = useState(new Date());
+
+  // Adhkar completion tracking
+  const [adhkarCompleted, setAdhkarCompleted] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('adhkar_completed');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  const todayKey = new Date().toISOString().split('T')[0];
+
+  // Save adhkar completion to localStorage
+  useEffect(() => {
+    localStorage.setItem('adhkar_completed', JSON.stringify(adhkarCompleted));
+  }, [adhkarCompleted]);
+
+  const handleAdhkarComplete = (id: string, count: number) => {
+    const key = `${todayKey}_${id}`;
+    const current = adhkarCompleted[key] || 0;
+    const newCount = Math.min(count, current + 1);
+    setAdhkarCompleted({ ...adhkarCompleted, [key]: newCount });
+  };
+
+  const getAdhkarProgress = (id: string, count: number) => {
+    const key = `${todayKey}_${id}`;
+    return adhkarCompleted[key] || 0;
+  };
 
   // Filter tasks for quran category and current date
   const quranTasks = useMemo(() => {
@@ -236,18 +328,21 @@ const Quran = () => {
       </div>
 
       <Tabs defaultValue="prayer" className="px-4">
-        <TabsList className="w-full bg-card border border-border">
-          <TabsTrigger value="tasks" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <ListTodo className="w-3.5 h-3.5 ml-1" /> المهام
+        <TabsList className="w-full bg-card border border-border grid grid-cols-5">
+          <TabsTrigger value="tasks" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <ListTodo className="w-3.5 h-3.5 ml-1" /> {isRTL ? "المهام" : "Tasks"}
           </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <CalendarIcon className="w-3.5 h-3.5 ml-1" /> التقويم
+          <TabsTrigger value="adhkar" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Heart className="w-3.5 h-3.5 ml-1" /> {isRTL ? "الأذكار" : "Adhkar"}
           </TabsTrigger>
-          <TabsTrigger value="quran" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <BookOpen className="w-3.5 h-3.5 ml-1" /> القرآن
+          <TabsTrigger value="calendar" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <CalendarIcon className="w-3.5 h-3.5 ml-1" /> {isRTL ? "التقويم" : "Calendar"}
           </TabsTrigger>
-          <TabsTrigger value="prayer" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Clock className="w-3.5 h-3.5 ml-1" /> الصلاة
+          <TabsTrigger value="quran" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <BookOpen className="w-3.5 h-3.5 ml-1" /> {isRTL ? "القرآن" : "Quran"}
+          </TabsTrigger>
+          <TabsTrigger value="prayer" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Clock className="w-3.5 h-3.5 ml-1" /> {isRTL ? "الصلاة" : "Prayer"}
           </TabsTrigger>
         </TabsList>
 
@@ -425,6 +520,101 @@ const Quran = () => {
           </div>
         </TabsContent>
 
+        {/* Adhkar Tab */}
+        <TabsContent value="adhkar" className="space-y-4 mt-4">
+          <h3 className="font-bold text-right">{isRTL ? "الأذكار اليومية" : "Daily Adhkar"}</h3>
+          
+          {Object.entries(adhkarData).map(([key, section]) => {
+            const iconMap: Record<string, any> = {
+              Sun: Sun,
+              Moon: Moon,
+              MoonStar: MoonStar,
+              Heart: Heart,
+              Sparkles: Sparkles,
+            };
+            const Icon = iconMap[section.icon];
+            const totalItems = section.items.length;
+            const completedItems = section.items.filter(item => {
+              const progress = getAdhkarProgress(item.id, item.count);
+              return progress >= item.count;
+            }).length;
+            const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+            return (
+              <div key={key} className="bg-card rounded-2xl p-4 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-right">{section.title}</h4>
+                      <p className="text-xs text-muted-foreground text-right">
+                        {completedItems}/{totalItems} {isRTL ? "مكتمل" : "completed"} • {progressPercentage}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {section.items.map((item) => {
+                    const progress = getAdhkarProgress(item.id, item.count);
+                    const isCompleted = progress >= item.count;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-3 rounded-xl border ${
+                          isCompleted ? "border-primary/50 bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 text-right">
+                            <p className="text-sm font-semibold mb-1" style={{ fontFamily: "'Traditional Arabic', serif", fontSize: "18px" }}>
+                              {item.text}
+                            </p>
+                            <p className="text-xs text-muted-foreground italic mb-2">
+                              {item.transliteration}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{isRTL ? "العدد:" : "Count:"} {item.count}</span>
+                              <span>•</span>
+                              <span className={isCompleted ? "text-primary font-semibold" : ""}>
+                                {progress}/{item.count}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAdhkarComplete(item.id, item.count)}
+                            className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                              isCompleted
+                                ? "bg-primary border-primary"
+                                : "border-muted-foreground hover:border-primary"
+                            }`}
+                            disabled={isCompleted}
+                          >
+                            {isCompleted && <CheckCircle2 className="w-4 h-4 text-primary-foreground" />}
+                          </button>
+                        </div>
+                        {progress > 0 && progress < item.count && (
+                          <div className="mt-2">
+                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full transition-all"
+                                style={{ width: `${(progress / item.count) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </TabsContent>
+
         {/* Tasks */}
         <TabsContent value="tasks" className="space-y-3 mt-4">
           <div className="flex items-center justify-between">
@@ -500,12 +690,15 @@ const Quran = () => {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="text-muted-foreground hover:text-destructive shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <EditTaskDialog task={task} />
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

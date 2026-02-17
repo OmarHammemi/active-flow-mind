@@ -6,6 +6,7 @@ import { GraduationCap, BookMarked, ListTodo, Plus, X, Circle, CheckCircle2, Boo
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
+import EditTaskDialog from "@/components/EditTaskDialog";
 import { format } from "date-fns";
 import { Task } from "@/lib/supabase";
 
@@ -212,12 +213,15 @@ const Knowledge = () => {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="text-muted-foreground hover:text-destructive shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <EditTaskDialog task={task} />
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
