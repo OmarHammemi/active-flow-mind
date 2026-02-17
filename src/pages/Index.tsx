@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 import { Flame, Star, BookOpen, Briefcase, Dumbbell, GraduationCap } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area } from "recharts";
@@ -14,13 +15,15 @@ const weekData = [
 ];
 
 const sections = [
-  { name: "العمل والإنتاجية", icon: Briefcase, color: "bg-blue-500", progress: 0, habits: "0/2", xp: 0 },
-  { name: "القرآن والصلاة", icon: BookOpen, color: "bg-emerald-500", progress: 0, habits: "0/3", xp: 0 },
-  { name: "المعرفة والتعلم", icon: GraduationCap, color: "bg-pink-500", progress: 0, habits: "0/1", xp: 0 },
-  { name: "الصحة والرياضة", icon: Dumbbell, color: "bg-orange-500", progress: 0, habits: "0/3", xp: 0 },
+  { name: "العمل والإنتاجية", icon: Briefcase, color: "bg-blue-500", progress: 0, habits: "0/2", xp: 0, path: "/work" },
+  { name: "القرآن والصلاة", icon: BookOpen, color: "bg-emerald-500", progress: 0, habits: "0/3", xp: 0, path: "/quran" },
+  { name: "المعرفة والتعلم", icon: GraduationCap, color: "bg-pink-500", progress: 0, habits: "0/1", xp: 0, path: "/knowledge" },
+  { name: "الصحة والرياضة", icon: Dumbbell, color: "bg-orange-500", progress: 0, habits: "0/3", xp: 0, path: "/sport" },
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="pb-4 space-y-6">
       {/* Greeting */}
@@ -82,7 +85,11 @@ const Index = () => {
           {sections.map((section) => {
             const Icon = section.icon;
             return (
-              <div key={section.name} className="bg-card rounded-2xl p-4 border border-border space-y-3">
+              <div 
+                key={section.name} 
+                onClick={() => navigate(section.path)}
+                className="bg-card rounded-2xl p-4 border border-border space-y-3 cursor-pointer hover:border-primary/50 transition-all duration-200 active:scale-[0.98]"
+              >
                 <div className="flex items-center justify-between">
                   <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full">+XP {section.xp}</span>
                   <div className="flex items-center gap-2">

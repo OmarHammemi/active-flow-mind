@@ -43,21 +43,25 @@ const Landing = () => {
           icon: BookOpen,
           title: "القرآن والصلاة",
           description: "تتبع قراءة القرآن والصلوات الخمس",
+          path: "/quran",
         },
         {
           icon: Target,
           title: "العمل والإنتاجية",
           description: "إدارة المهام والأهداف المهنية",
+          path: "/work",
         },
         {
           icon: Heart,
           title: "الصحة والرياضة",
           description: "روتين التمارين وإدارة الوزن",
+          path: "/sport",
         },
         {
           icon: Moon,
           title: "المعرفة والتعلم",
           description: "تتبع قراءة الكتب والتعلم اليومي",
+          path: "/knowledge",
         },
       ],
       benefits: [
@@ -95,21 +99,25 @@ const Landing = () => {
           icon: BookOpen,
           title: "Quran & Prayer",
           description: "Track Quran recitation and five daily prayers",
+          path: "/quran",
         },
         {
           icon: Target,
           title: "Work & Productivity",
           description: "Manage tasks and professional goals",
+          path: "/work",
         },
         {
           icon: Heart,
           title: "Health & Fitness",
           description: "Exercise routines and weight management",
+          path: "/sport",
         },
         {
           icon: Moon,
           title: "Knowledge & Learning",
           description: "Track book reading and daily learning",
+          path: "/knowledge",
         },
       ],
       benefits: [
@@ -415,17 +423,19 @@ const Landing = () => {
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50 hover:border-primary/30 transition-all duration-300 group">
-                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <Icon className="w-7 h-7 text-primary" />
+                  <Link to={feature.path || "/dashboard"}>
+                    <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50 hover:border-primary/30 transition-all duration-300 group cursor-pointer">
+                      <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Icon className="w-7 h-7 text-primary" />
+                      </div>
+                      <h3 className={`font-bold text-foreground mb-2 ${isRTL ? "font-arabic" : ""}`}>
+                        {feature.title}
+                      </h3>
+                      <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
+                        {feature.description}
+                      </p>
                     </div>
-                    <h3 className={`font-bold text-foreground mb-2 ${isRTL ? "font-arabic" : ""}`}>
-                      {feature.title}
-                    </h3>
-                    <p className={`text-sm text-muted-foreground ${isRTL ? "font-arabic" : ""}`}>
-                      {feature.description}
-                    </p>
-                  </div>
+                  </Link>
                 </motion.div>
               );
             })}
