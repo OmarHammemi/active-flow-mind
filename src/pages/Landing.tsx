@@ -12,12 +12,8 @@ const Landing = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect to dashboard if user is already logged in
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, loading, navigate]);
+  // Don't redirect - always show landing page
+  // Users can navigate to dashboard manually if logged in
 
   const content = {
     ar: {

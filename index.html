@@ -1,30 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>فلاح - متتبع الأهداف</title>
-    <meta name="description" content="منصة شاملة لتتبع عباداتك وعاداتك اليومية" />
-    <meta name="author" content="فلاح" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" href="/favicon.ico" />
-
     <meta property="og:title" content="فلاح - متتبع الأهداف" />
-    <meta property="og:description" content="منصة شاملة لتتبع عباداتك وعاداتك اليومية" />
-    <meta property="og:type" content="website" />
+    <meta property="og:description" content="تطبيق متتبع الأهداف والعادات اليومية" />
     <meta property="og:image" content="/logo.svg" />
-
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/logo.svg" />
-  </head>
-
-  <body>
-    <div id="root"></div>
+    <title>فلاح - متتبع الأهداف</title>
     <script>
-      // Force cache clear
+      // Force cache refresh
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for(let registration of registrations) {
@@ -32,7 +23,6 @@
           }
         });
       }
-      // Clear all caches
       if ('caches' in window) {
         caches.keys().then(function(names) {
           for (let name of names) {
@@ -41,6 +31,9 @@
         });
       }
     </script>
+  </head>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

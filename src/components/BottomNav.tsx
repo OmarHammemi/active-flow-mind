@@ -1,8 +1,8 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Briefcase, Dumbbell, GraduationCap, Settings } from "lucide-react";
+import { LayoutDashboard, BookOpen, Briefcase, Dumbbell, GraduationCap, User } from "lucide-react";
 
 const navItems = [
-  { path: "/settings", label: "الإعدادات", icon: Settings },
+  { path: "/profile", label: "الملف الشخصي", icon: User },
   { path: "/knowledge", label: "المعرفة", icon: GraduationCap },
   { path: "/sport", label: "الرياضة", icon: Dumbbell },
   { path: "/work", label: "العمل", icon: Briefcase },

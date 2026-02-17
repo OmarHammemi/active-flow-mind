@@ -9,12 +9,8 @@ export default defineConfig(({ mode }) => ({
     host: "0.0.0.0",
     port: 3006,
     strictPort: true,
-    allowedHosts: [
-      "falah.live",
-      "www.falah.live",
-      "20.107.168.51",
-      "localhost",
-    ],
+    // Use 'all' to allow all hosts, or specify the exact hosts
+    allowedHosts: "all", // This allows all hosts - use only in development!
     hmr: {
       host: "falah.live",
       port: 3006,
@@ -23,7 +19,10 @@ export default defineConfig(({ mode }) => ({
     },
     cors: true,
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

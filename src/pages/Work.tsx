@@ -1,37 +1,69 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Briefcase, Plus, X, Circle, CheckCircle2 } from "lucide-react";
-
-interface Task {
-  id: string;
-  text: string;
-  done: boolean;
-}
+import { Briefcase, X, Circle, CheckCircle2, Calendar, Clock } from "lucide-react";
+import { useTasks } from "@/contexts/TaskContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import CreateTaskDialog from "@/components/CreateTaskDialog";
+import { format } from "date-fns";
+import { Task } from "@/lib/supabase";
 
 const Work = () => {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: "1", text: "مهمة 1", done: false },
-    { id: "2", text: "مهمة 2", done: false },
-    { id: "3", text: "مهمة 3", done: false },
-  ]);
-  const [newTask, setNewTask] = useState("");
+  const { tasks, loading, deleteTask, completeTask, uncompleteTask, getTasksForDate } = useTasks();
+  const { isRTL } = useLanguage();
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    setTasks([...tasks, { id: Date.now().toString(), text: newTask, done: false }]);
-    setNewTask("");
+  // Filter tasks for work category and current date
+  const workTasks = useMemo(() => {
+    const todayTasks = getTasksForDate(selectedDate);
+    return todayTasks.filter(task => task.category === 'work');
+  }, [tasks, selectedDate, getTasksForDate]);
+
+  const todayStr = selectedDate.toISOString().split('T')[0];
+  const completedToday = workTasks.filter(task => {
+    return task.completed_dates?.includes(todayStr) || false;
+  });
+  const doneCount = completedToday.length;
+  const totalCount = workTasks.length;
+
+  const handleToggleTask = async (task: Task) => {
+    const isCompleted = task.completed_dates?.includes(todayStr) || false;
+    if (isCompleted) {
+      await uncompleteTask(task.id, todayStr);
+    } else {
+      await completeTask(task.id, todayStr);
+    }
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const getScheduleInfo = (task: Task) => {
+    if (task.schedule_type === 'daily') {
+      return { icon: Clock, text: isRTL ? "يومي" : "Daily" };
+    } else if (task.schedule_type === 'weekly') {
+      const days = task.weekly_days || [];
+      const dayNames = days.map(d => {
+        const dayMap: { [key: number]: string } = {
+          0: isRTL ? "أحد" : "Sun",
+          1: isRTL ? "إثنين" : "Mon",
+          2: isRTL ? "ثلاثاء" : "Tue",
+          3: isRTL ? "أربعاء" : "Wed",
+          4: isRTL ? "خميس" : "Thu",
+          5: isRTL ? "جمعة" : "Fri",
+          6: isRTL ? "سبت" : "Sat",
+        };
+        return dayMap[d];
+      });
+      return { icon: Calendar, text: dayNames.join(", ") };
+    } else {
+      return { icon: Calendar, text: isRTL ? "مرة واحدة" : "One-time" };
+    }
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
-  };
-
-  const doneCount = tasks.filter(t => t.done).length;
+  if (loading) {
+    return (
+      <div className="pb-4 flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-4">
@@ -39,13 +71,19 @@ const Work = () => {
         <div className="flex items-center justify-between">
           <div className="text-left">
             <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full">+XP 0</span>
-            <p className="text-xs text-muted-foreground mt-1">{doneCount}/{tasks.length} مكتمل</p>
-            <p className="text-2xl font-bold">{tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0}%</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {doneCount}/{totalCount} {isRTL ? "مكتمل" : "completed"}
+            </p>
+            <p className="text-2xl font-bold">
+              {totalCount ? Math.round((doneCount / totalCount) * 100) : 0}%
+            </p>
           </div>
           <div className="flex items-center gap-2 text-right">
             <div>
-              <h2 className="text-lg font-bold">العمل والإنتاجية</h2>
-              <p className="text-xs text-muted-foreground">حقق أهدافك المهنية</p>
+              <h2 className="text-lg font-bold">{isRTL ? "العمل والإنتاجية" : "Work & Productivity"}</h2>
+              <p className="text-xs text-muted-foreground">
+                {isRTL ? "حقق أهدافك المهنية" : "Achieve your professional goals"}
+              </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-white" />
@@ -56,45 +94,83 @@ const Work = () => {
 
       <div className="px-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{doneCount}/{tasks.length} مهم</span>
-          <h3 className="font-bold">إكمال المهام اليومية</h3>
+          <span className="text-sm text-muted-foreground">
+            {totalCount} {isRTL ? "مهمة" : "tasks"}
+          </span>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold">{isRTL ? "إكمال المهام اليومية" : "Daily Tasks"}</h3>
+            <span className="text-xs text-muted-foreground">
+              {format(selectedDate, "yyyy-MM-dd")}
+            </span>
+          </div>
         </div>
 
-        {tasks.map((task) => (
-          <div key={task.id} className="bg-card rounded-xl p-4 border border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button onClick={() => deleteTask(task.id)} className="text-muted-foreground hover:text-destructive">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm ${task.done ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
-              <button onClick={() => toggleTask(task.id)}>
-                {task.done ? (
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
-                ) : (
-                  <Circle className="w-5 h-5 text-muted-foreground" />
-                )}
-              </button>
-            </div>
+        {workTasks.length === 0 ? (
+          <div className="bg-card rounded-xl p-8 border border-border text-center">
+            <p className="text-muted-foreground mb-4">
+              {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
+            </p>
+            <CreateTaskDialog category="work" />
           </div>
-        ))}
+        ) : (
+          <>
+            {workTasks.map((task) => {
+              const isCompleted = task.completed_dates?.includes(todayStr) || false;
+              const scheduleInfo = getScheduleInfo(task);
+              const ScheduleIcon = scheduleInfo.icon;
+
+              return (
+                <div
+                  key={task.id}
+                  className="bg-card rounded-xl p-4 border border-border"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <button
+                        onClick={() => handleToggleTask(task)}
+                        className="shrink-0"
+                      >
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </button>
+                      <div className="flex-1 text-right">
+                        <span
+                          className={`text-sm block ${
+                            isCompleted ? "line-through text-muted-foreground" : ""
+                          }`}
+                        >
+                          {task.title}
+                        </span>
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                          <ScheduleIcon className="w-3 h-3" />
+                          <span>{scheduleInfo.text}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
 
         {/* Add task */}
         <div className="bg-card rounded-xl p-3 border border-border">
-          <div className="flex gap-2 items-center">
-            <Button onClick={addTask} size="sm" variant="ghost" className="shrink-0 text-primary">
-              <Plus className="w-5 h-5" />
-              <span className="text-sm">إضافة</span>
-            </Button>
-            <Input
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addTask()}
-              placeholder="أضف مهمة جديدة..."
-              className="text-right border-0 bg-transparent focus-visible:ring-0"
-            />
-          </div>
+          <CreateTaskDialog category="work" />
         </div>
       </div>
     </div>

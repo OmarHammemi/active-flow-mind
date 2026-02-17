@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, MapPin, Camera, Target, Edit, Save, X, Mail, Calendar, LogOut } from "lucide-react";
+import { User, MapPin, Camera, Target, Edit, Save, X, Mail, Calendar, LogOut, Globe, Languages, Moon, Clock, Bell, Heart, BellRing, Volume2, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { Switch } from "@/components/ui/switch";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -26,6 +27,14 @@ const Profile = () => {
   const { isRTL } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Settings state
+  const [settingsNotifications, setSettingsNotifications] = useState({
+    prayer: true,
+    quran: true,
+    habits: false,
+    sounds: true,
+  });
 
   // Initialize form with profile data
   useEffect(() => {
@@ -299,6 +308,42 @@ const Profile = () => {
             </div>
           )}
 
+          {/* Settings Section */}
+          <div className="px-4 space-y-2">
+            <h3 className="font-bold text-right text-muted-foreground text-sm">الإعدادات العامة</h3>
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              <SettingRow icon={Globe} label="المنطقة الزمنية" value="UTC+1" />
+              <SettingRow icon={Languages} label="اللغة" value="العربية" />
+              <SettingRow icon={Moon} label="الوضع الداكن" value="مفعل" />
+              <SettingRow icon={Clock} label="تنسيق الوقت" value="24 ساعة" last />
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="px-4 space-y-2">
+            <h3 className="font-bold text-right text-muted-foreground text-sm">الإشعارات</h3>
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              <NotifRow icon={Bell} label="تذكير الصلاة" checked={settingsNotifications.prayer} onChange={(v) => setSettingsNotifications({ ...settingsNotifications, prayer: v })} />
+              <NotifRow icon={Heart} label="تذكير القرآن" checked={settingsNotifications.quran} onChange={(v) => setSettingsNotifications({ ...settingsNotifications, quran: v })} />
+              <NotifRow icon={BellRing} label="تذكير العادات" checked={settingsNotifications.habits} onChange={(v) => setSettingsNotifications({ ...settingsNotifications, habits: v })} />
+              <NotifRow icon={Volume2} label="الأصوات" checked={settingsNotifications.sounds} onChange={(v) => setSettingsNotifications({ ...settingsNotifications, sounds: v })} last />
+            </div>
+          </div>
+
+          {/* Subscription */}
+          <div className="px-4 space-y-2">
+            <h3 className="font-bold text-right text-muted-foreground text-sm">الاشتراك والدفع</h3>
+            <div className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="outline">ترقية</Button>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">الخطة المجانية</span>
+                  <CreditCard className="w-5 h-5 text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div className="mx-4 space-y-2">
             <Button
@@ -323,5 +368,35 @@ const Profile = () => {
     </div>
   );
 };
+
+// Helper components for settings rows
+const SettingRow = ({ icon: Icon, label, value, last }: { icon: any; label: string; value: string; last?: boolean }) => (
+  <div className={`flex items-center justify-between px-4 py-3 ${!last ? "border-b border-border" : ""}`}>
+    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+      <ChevronIcon />
+      <span>{value}</span>
+    </div>
+    <div className="flex items-center gap-3">
+      <span className="text-sm">{label}</span>
+      <Icon className="w-5 h-5 text-muted-foreground" />
+    </div>
+  </div>
+);
+
+const ChevronIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+);
+
+const NotifRow = ({ icon: Icon, label, checked, onChange, last }: { icon: any; label: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean }) => (
+  <div className={`flex items-center justify-between px-4 py-3 ${!last ? "border-b border-border" : ""}`}>
+    <Switch checked={checked} onCheckedChange={onChange} />
+    <div className="flex items-center gap-3">
+      <span className="text-sm">{label}</span>
+      <Icon className="w-5 h-5 text-muted-foreground" />
+    </div>
+  </div>
+);
 
 export default Profile;

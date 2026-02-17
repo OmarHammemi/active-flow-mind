@@ -1,32 +1,28 @@
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Dark blue background gradient -->
-    <linearGradient id="blueBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#1a2f4d;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#152238;stop-opacity:1" />
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2a4a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1a2e;stop-opacity:1" />
     </linearGradient>
     
-    <!-- Golden gradient with highlights -->
+    <!-- Gold gradient for the main design -->
     <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFE5B4;stop-opacity:1" />
-      <stop offset="20%" style="stop-color:#FFD700;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
-      <stop offset="80%" style="stop-color:#FFD700;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#D4AF37;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ffed4e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d4af37;stop-opacity:1" />
     </linearGradient>
     
-    <!-- Bright gold highlight for 3D effect -->
+    <!-- Gold highlight gradient -->
     <linearGradient id="goldHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFF8DC;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#FFD700;stop-opacity:0.9" />
-      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.7" />
+      <stop offset="0%" style="stop-color:#fff9c4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffd700;stop-opacity:0.8" />
     </linearGradient>
     
-    <!-- Shadow for depth -->
-    <filter id="shadow">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-      <feOffset dx="0" dy="2" result="offsetblur"/>
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
       <feComponentTransfer>
         <feFuncA type="linear" slope="0.3"/>
       </feComponentTransfer>
@@ -35,72 +31,49 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    
-    <!-- Glow effect -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
   
-  <!-- Rounded square background (dark blue) -->
-  <rect x="28" y="28" width="200" height="200" rx="45" ry="45" fill="url(#blueBg)" />
+  <!-- Rounded square background with gradient -->
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#bgGradient)" filter="url(#shadow)"/>
   
-  <!-- Top golden sphere (small dot) -->
-  <circle cx="128" cy="75" r="8" fill="url(#goldGradient)" filter="url(#glow)"/>
-  <circle cx="128" cy="75" r="5" fill="url(#goldHighlight)" opacity="0.9"/>
+  <!-- Gold sphere at the top -->
+  <circle cx="256" cy="180" r="28" fill="url(#goldGradient)" filter="url(#shadow)"/>
+  <circle cx="256" cy="180" r="20" fill="url(#goldHighlight)" opacity="0.6"/>
   
-  <!-- Inverted U arch (dome shape) -->
-  <path d="M 105 75 Q 128 100 151 75" 
-        stroke="url(#goldGradient)" 
-        stroke-width="8" 
-        fill="none" 
-        stroke-linecap="round" 
-        filter="url(#glow)"/>
-  <path d="M 105 75 Q 128 100 151 75" 
+  <!-- Main golden ribbon design - stylized prayer/architectural element -->
+  <path d="M 256 200 
+           Q 240 200 230 220
+           Q 220 240 230 280
+           Q 240 320 260 360
+           Q 280 400 300 420
+           Q 320 440 340 430
+           Q 360 420 350 400
+           Q 340 380 320 360
+           Q 300 340 290 300
+           Q 280 260 270 240
+           Q 260 220 256 200 Z" 
+        fill="url(#goldGradient)" 
+        filter="url(#shadow)"/>
+  
+  <!-- Inner highlight on the ribbon -->
+  <path d="M 256 210 
+           Q 245 210 238 225
+           Q 231 240 238 275
+           Q 245 310 260 345
+           Q 275 380 290 400
+           Q 305 420 320 415
+           Q 335 410 330 395
+           Q 325 380 310 360
+           Q 295 340 288 305
+           Q 281 270 274 250
+           Q 267 230 256 210 Z" 
+        fill="url(#goldHighlight)" 
+        opacity="0.5"/>
+  
+  <!-- Additional depth lines on ribbon -->
+  <path d="M 270 240 L 280 280 L 300 340 L 320 390" 
         stroke="url(#goldHighlight)" 
         stroke-width="2" 
         fill="none" 
-        stroke-linecap="round" 
-        opacity="0.8"/>
-  
-  <!-- Main flowing ribbon (thick, sweeping curve) -->
-  <path d="M 151 75 Q 170 90 178 125 Q 186 160 172 195 Q 158 220 140 210" 
-        stroke="url(#goldGradient)" 
-        stroke-width="12" 
-        fill="none" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"
-        filter="url(#glow)"/>
-  
-  <!-- Highlight on main ribbon for 3D effect -->
-  <path d="M 151 75 Q 170 90 178 125 Q 186 160 172 195 Q 158 220 140 210" 
-        stroke="url(#goldHighlight)" 
-        stroke-width="3" 
-        fill="none" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"
-        opacity="0.9"/>
-  
-  <!-- Secondary ribbon layer for depth -->
-  <path d="M 148 80 Q 165 95 170 130 Q 175 165 163 190 Q 151 210 135 200" 
-        stroke="url(#goldGradient)" 
-        stroke-width="9" 
-        fill="none" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"
-        filter="url(#glow)"
-        opacity="0.8"/>
-  
-  <!-- Additional highlight on secondary ribbon -->
-  <path d="M 148 80 Q 165 95 170 130 Q 175 165 163 190 Q 151 210 135 200" 
-        stroke="url(#goldHighlight)" 
-        stroke-width="2" 
-        fill="none" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"
-        opacity="0.7"/>
+        opacity="0.4"/>
 </svg>

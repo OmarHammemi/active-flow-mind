@@ -1,12 +1,22 @@
-import { Settings } from "lucide-react";
+import { User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppHeader = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+
+  const avatarUrl = profile?.photo_url || user?.user_metadata?.avatar_url;
+  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0];
+
   return (
     <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-40 bg-background/80 backdrop-blur-lg">
-      <button onClick={() => navigate("/settings")} className="text-muted-foreground hover:text-foreground">
-        <Settings className="w-5 h-5" />
+      <button onClick={() => navigate("/profile")} className="text-muted-foreground hover:text-foreground">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={userName} className="w-8 h-8 rounded-full object-cover" />
+        ) : (
+          <User className="w-8 h-8" />
+        )}
       </button>
       <div className="flex items-center gap-2">
         <div className="text-right">
