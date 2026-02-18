@@ -567,8 +567,14 @@ const Quran = () => {
   }>>([]);
   const [prayerLoading, setPrayerLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // Auto-detect timezone from browser
   const [userTimezone, setUserTimezone] = useState<string>(() => {
-    return localStorage.getItem("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const saved = localStorage.getItem("timezone");
+    if (saved) return saved;
+    // Auto-detect browser timezone
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    localStorage.setItem("timezone", detected);
+    return detected;
   });
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -586,7 +592,7 @@ const Quran = () => {
     return () => clearInterval(interval);
   }, [userTimezone]);
 
-  // Update current time every second
+  // Update current time every second (in local timezone)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -594,7 +600,7 @@ const Quran = () => {
     return () => clearInterval(timer);
   }, []);
   
-  // Get user location or use default (Cairo as fallback)
+  // Get user location - auto-detect or use saved location
   useEffect(() => {
     const getLocation = async () => {
       const savedLocation = localStorage.getItem("user_location");
@@ -603,32 +609,59 @@ const Quran = () => {
           const loc = JSON.parse(savedLocation);
           setUserLocation(loc);
         } catch {
-          // Default to Cairo if parsing fails
-          setUserLocation({ lat: 30.0444, lng: 31.2357 });
+          // If saved location is invalid, try to get new one
+          requestLocation();
         }
       } else {
-        // Try to get from browser geolocation
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const loc = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              };
-              setUserLocation(loc);
-              localStorage.setItem("user_location", JSON.stringify(loc));
-            },
-            () => {
-              // Default to Cairo if geolocation fails
-              setUserLocation({ lat: 30.0444, lng: 31.2357 });
+        requestLocation();
+      }
+    };
+
+    const requestLocation = () => {
+      // Try to get from browser geolocation
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const loc = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setUserLocation(loc);
+            localStorage.setItem("user_location", JSON.stringify(loc));
+            // Also update timezone based on location (optional, but browser timezone is usually better)
+            const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (detectedTz && detectedTz !== userTimezone) {
+              setUserTimezone(detectedTz);
+              localStorage.setItem("timezone", detectedTz);
             }
-          );
-        } else {
-          // Default to Cairo
-          setUserLocation({ lat: 30.0444, lng: 31.2357 });
+          },
+          () => {
+            // If geolocation fails, try to detect timezone and use a default location for that timezone
+            const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            // Use Tunisia coordinates as default (since user mentioned Tunisia)
+            setUserLocation({ lat: 36.8065, lng: 10.1815 }); // Tunis, Tunisia
+            if (detectedTz && detectedTz !== userTimezone) {
+              setUserTimezone(detectedTz);
+              localStorage.setItem("timezone", detectedTz);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0 // Don't use cached location
+          }
+        );
+      } else {
+        // Default to Tunisia if geolocation not available
+        const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setUserLocation({ lat: 36.8065, lng: 10.1815 }); // Tunis, Tunisia
+        if (detectedTz && detectedTz !== userTimezone) {
+          setUserTimezone(detectedTz);
+          localStorage.setItem("timezone", detectedTz);
         }
       }
     };
+
     getLocation();
   }, []);
 
@@ -642,9 +675,10 @@ const Quran = () => {
         const today = new Date();
         const dateStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
         
-        // Use Aladhan API
+        // Use Aladhan API - let API auto-detect timezone from coordinates
+        // The API will automatically use the correct timezone for the location
         const response = await fetch(
-          `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${userLocation.lat}&longitude=${userLocation.lng}&method=2&timezonestring=${userTimezone}`
+          `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${userLocation.lat}&longitude=${userLocation.lng}&method=2`
         );
         
         if (!response.ok) throw new Error("Failed to fetch prayer times");
@@ -652,6 +686,7 @@ const Quran = () => {
         const data = await response.json();
         const timings = data.data.timings;
         const dateForTimings = data.data.date; // API provides date info
+        const apiTimezone = data.data.meta.timezone || userTimezone; // Use API's timezone
 
         const prayers = [
           { key: "Fajr", name: prayerNames.Fajr, time: timings.Fajr },
@@ -662,43 +697,39 @@ const Quran = () => {
           { key: "Isha", name: prayerNames.Isha, time: timings.Isha },
         ];
 
-        // Get current time - we'll compare everything in UTC milliseconds
+        // Get current time in the API's timezone (which matches the location)
         const now = new Date();
-        let nextPrayerIndex = -1;
-
-        // Process prayer times - API returns times already in the specified timezone
-        // Get current time in user's timezone for comparison
-        const nowInUserTz = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
-        const currentHour = nowInUserTz.getHours();
-        const currentMinute = nowInUserTz.getMinutes();
+        const nowInApiTz = new Date(now.toLocaleString("en-US", { timeZone: apiTimezone }));
+        const currentHour = nowInApiTz.getHours();
+        const currentMinute = nowInApiTz.getMinutes();
         const currentTimeMinutes = currentHour * 60 + currentMinute;
         
         const processedPrayers = prayers.map((prayer, index) => {
           const [hours, minutes] = prayer.time.split(":").map(Number);
           const prayerTimeMinutes = hours * 60 + minutes;
           
-          // Check if prayer has passed today (in user's timezone)
+          // Check if prayer has passed today (in API's timezone)
           const passed = prayerTimeMinutes < currentTimeMinutes;
           
-          // For countdown calculation, create a Date object
-          // Get today's date in user's timezone
-          const year = nowInUserTz.getFullYear();
-          const month = nowInUserTz.getMonth();
-          const day = nowInUserTz.getDate();
+          // Create Date object for prayer time in the API's timezone
+          const year = nowInApiTz.getFullYear();
+          const month = nowInApiTz.getMonth();
+          const day = nowInApiTz.getDate();
           
-          // Create date string for prayer time
+          // Create date string in ISO format, then convert to Date
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
           
-          // Calculate timezone offset to convert to proper Date object
-          const browserNow = new Date();
-          const browserTzStr = browserNow.toLocaleString("en-US");
-          const userTzStr = browserNow.toLocaleString("en-US", { timeZone: userTimezone });
-          const browserDate = new Date(browserTzStr);
-          const userDate = new Date(userTzStr);
-          const offsetMs = browserDate.getTime() - userDate.getTime();
+          // Parse the date string as if it's in the API timezone
+          // Create a date object by treating the time as local time in the API timezone
+          const dateInApiTz = new Date(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
           
-          // Create prayer time date
-          let prayerTime = new Date(new Date(dateStr).getTime() + offsetMs);
+          // Calculate offset between browser timezone and API timezone
+          const browserTime = new Date();
+          const browserTimeInApiTz = new Date(browserTime.toLocaleString("en-US", { timeZone: apiTimezone }));
+          const browserTimeInBrowserTz = new Date(browserTime.toLocaleString("en-US"));
+          const offsetMs = browserTimeInBrowserTz.getTime() - browserTimeInApiTz.getTime();
+          
+          let prayerTime = new Date(dateInApiTz.getTime() + offsetMs);
           
           // If passed, set for tomorrow
           if (passed) {
@@ -921,7 +952,7 @@ const Quran = () => {
                     <div className="flex items-center justify-center gap-2">
                       <Clock className="w-6 h-6 text-primary animate-pulse" />
                       <p className="text-5xl font-bold text-primary tabular-nums">
-                        {currentTime.toLocaleTimeString(isRTL ? "ar-EG" : "en-US", {
+                        {currentTime.toLocaleTimeString(isRTL ? "ar-TN" : "en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
                           second: "2-digit",
@@ -1136,12 +1167,13 @@ const Quran = () => {
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الوقت الحالي" : "Current Time"}</p>
                     <p className="text-xl font-bold">
-                      {currentTime.toLocaleTimeString(isRTL ? "ar-EG" : "en-US", {
+                      {currentTime.toLocaleTimeString(isRTL ? "ar-TN" : "en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
                         second: "2-digit",
                         timeZone: userTimezone,
                         hour12: localStorage.getItem("timeFormat") === "12"
+                      })}
                       })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
