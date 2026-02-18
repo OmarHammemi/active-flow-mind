@@ -321,6 +321,25 @@ const Quran = () => {
     const saved = localStorage.getItem("quran_bookmark");
     return saved ? JSON.parse(saved) : null;
   });
+  const [quranVerses, setQuranVerses] = useState<Record<number, { 
+    verses: Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }> 
+  }>>({});
+  const [loadingVerses, setLoadingVerses] = useState(false);
+  
+  // Clear cache when page changes significantly (to save memory)
+  useEffect(() => {
+    // Keep only current page and adjacent pages in cache
+    const pagesToKeep = [currentPage - 1, currentPage, currentPage + 1].filter(p => p >= 1 && p <= 604);
+    const newCache: Record<number, { verses: string[] }> = {};
+    pagesToKeep.forEach(page => {
+      if (quranVerses[page]) {
+        newCache[page] = quranVerses[page];
+      }
+    });
+    if (Object.keys(newCache).length < Object.keys(quranVerses).length) {
+      setQuranVerses(newCache);
+    }
+  }, [currentPage]);
 
   // Save current page to localStorage
   useEffect(() => {
@@ -343,39 +362,182 @@ const Quran = () => {
     return suraList[0];
   };
 
-  const getVerses = () => {
+  // Fetch verses for a specific page from API
+  const fetchPageVerses = async (pageNumber: number): Promise<Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }>> => {
+    if (quranVerses[pageNumber]) {
+      return quranVerses[pageNumber].verses;
+    }
+
+    setLoadingVerses(true);
+    try {
+      // Get the primary surah for this page
+      const primarySura = (() => {
+        for (let i = suraList.length - 1; i >= 0; i--) {
+          if (pageNumber >= suraList[i].startPage) {
+            return suraList[i];
+          }
+        }
+        return suraList[0];
+      })();
+      const surahNumber = primarySura.number;
+      
+      // Use Al-Quran Cloud API to get verses by surah (correct verse numbers, no Bismillah as verse 1)
+      const response = await fetch(`https://api.alquran.cloud/v1/surah/${surahNumber}/quran-uthmani`);
+      if (!response.ok) throw new Error("Failed to fetch verses");
+      
+      const data = await response.json();
+      if (data.code === 200 && data.data) {
+        // Map response.data.ayahs to verses array
+        // This API returns correct verse numbers - Bismillah is NOT included as a verse
+        const verses: Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }> = [];
+        
+        // Add Bismillah as decorative header (except for Surah 9)
+        if (surahNumber !== 9) {
+          verses.push({
+            text: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+            number: 0,
+            isBismillah: true,
+            suraNumber: surahNumber
+          });
+        }
+        
+        // Map ayahs to verses - use ayah.numberInSurah for display number
+        data.data.ayahs.forEach((ayah: any) => {
+          verses.push({
+            text: ayah.text,
+            number: ayah.numberInSurah, // Correct verse number from API
+            isBismillah: false,
+            suraNumber: surahNumber
+          });
+        });
+        
+        setQuranVerses(prev => ({
+          ...prev,
+          [pageNumber]: { verses }
+        }));
+        return verses;
+      }
+    } catch (error) {
+      console.error("Error fetching page verses:", error);
+      // Fallback: try to get from sura-based API
     const currentSura = getCurrentSura();
+      if (currentSura.number === 1 && sampleVerses[1]) {
+        return sampleVerses[1].verses;
+      }
+      if (currentSura.number === 2 && sampleVerses[2]) {
+        return sampleVerses[2].verses;
+      }
+    } finally {
+      setLoadingVerses(false);
+    }
+    return [];
+  };
+
+  // Get suras present on current page
+  const getSurasOnPage = (pageNumber: number) => {
+    const suras: Array<{ number: number; name: string }> = [];
+    let foundStart = false;
     
-    // Show sample verses for first two suras, otherwise show sura info
-    if (currentPage <= 1) {
-      return { 
-        sura: "الفاتحة", 
-        verses: sampleVerses[1].verses,
+    for (let i = 0; i < suraList.length; i++) {
+      const sura = suraList[i];
+      const nextSura = suraList[i + 1];
+      
+      // Check if this page is within this sura's range
+      if (pageNumber >= sura.startPage) {
+        if (!nextSura || pageNumber < nextSura.startPage) {
+          suras.push({ number: sura.number, name: sura.name });
+          foundStart = true;
+        } else if (pageNumber === nextSura.startPage - 1) {
+          // Page might contain end of current sura and start of next
+          suras.push({ number: sura.number, name: sura.name });
+          if (i + 1 < suraList.length) {
+            suras.push({ number: nextSura.number, name: nextSura.name });
+          }
+          break;
+        }
+      }
+    }
+    
+    return suras.length > 0 ? suras : [{ number: getCurrentSura().number, name: getCurrentSura().name }];
+  };
+
+  const getVerses = async () => {
+    const surasOnPage = getSurasOnPage(currentPage);
+    const primarySura = surasOnPage[0];
+    
+    // Try to get verses from cache or fetch them
+    let verses: Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }> = [];
+    if (quranVerses[currentPage]) {
+      verses = quranVerses[currentPage].verses;
+    } else {
+      // Fetch verses for this page
+      verses = await fetchPageVerses(currentPage);
+    }
+    
+    if (verses.length > 0) {
+      return {
+        sura: primarySura.name,
+        verses: verses,
+        suraNumber: primarySura.number,
+        totalVerses: primarySura.verses,
+        surasOnPage: surasOnPage
+      };
+    }
+    
+    // Fallback for first two suras
+    if (primarySura.number === 1 && sampleVerses[1]) {
+      return {
+        sura: "الفاتحة",
+        verses: sampleVerses[1].verses.map((v, i) => ({
+          text: v,
+          number: i + 1,
+          isBismillah: i === 0,
+          suraNumber: 1
+        })),
         suraNumber: 1,
-        totalVerses: 7
+        totalVerses: 7,
+        surasOnPage: [{ number: 1, name: "الفاتحة" }]
       };
     }
-    if (currentPage <= 49 && currentPage >= 2) {
-      return { 
-        sura: "البقرة", 
-        verses: sampleVerses[2].verses,
+    if (primarySura.number === 2 && sampleVerses[2]) {
+      return {
+        sura: "البقرة",
+        verses: sampleVerses[2].verses.map((v, i) => ({
+          text: v,
+          number: i + 1,
+          isBismillah: i === 0,
+          suraNumber: 2
+        })),
         suraNumber: 2,
-        totalVerses: 286
+        totalVerses: 286,
+        surasOnPage: [{ number: 2, name: "البقرة" }]
       };
     }
     
-    // For other pages, show sura information
-    return { 
-      sura: currentSura.name, 
+    // Default fallback
+    return {
+      sura: primarySura.name,
       verses: [
-        `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ`,
-        `${isRTL ? "سورة" : "Sura"} ${currentSura.name}`,
-        `${isRTL ? "عدد الآيات:" : "Total verses:"} ${currentSura.verses}`,
-        `${isRTL ? "الصفحة" : "Page"} ${currentPage}`,
-        `${isRTL ? "لإظهار الآيات الكاملة، يرجى استخدام مصدر بيانات القرآن الكامل" : "To display full verses, please use a complete Quran data source"}`
+        {
+          text: `بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ`,
+          number: 0,
+          isBismillah: true,
+          suraNumber: primarySura.number
+        },
+        {
+          text: `${isRTL ? "سورة" : "Sura"} ${primarySura.name}`,
+          number: 0,
+          suraNumber: primarySura.number
+        },
+        {
+          text: `${isRTL ? "جاري تحميل الآيات..." : "Loading verses..."}`,
+          number: 0,
+          suraNumber: primarySura.number
+        }
       ],
-      suraNumber: currentSura.number,
-      totalVerses: currentSura.verses
+      suraNumber: primarySura.number,
+      totalVerses: primarySura.verses,
+      surasOnPage: surasOnPage
     };
   };
 
@@ -504,50 +666,44 @@ const Quran = () => {
         const now = new Date();
         let nextPrayerIndex = -1;
 
-        // Helper function to convert a time in user's timezone to a Date object
-        const createDateInTimezone = (hours: number, minutes: number, timezone: string): Date => {
-          // Get current date in the specified timezone
-          const nowInTz = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
-          const year = nowInTz.getFullYear();
-          const month = nowInTz.getMonth();
-          const day = nowInTz.getDate();
-          
-          // Create date string in ISO format
-          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-          
-          // Create a date object - this will be in browser's local timezone
-          const localDate = new Date(dateStr);
-          
-          // Calculate the offset between browser timezone and target timezone
-          // Get what the current time would be in the target timezone
-          const nowInTargetTz = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
-          const nowInBrowserTz = new Date(now.toLocaleString("en-US"));
-          
-          // Calculate offset in milliseconds
-          const offsetMs = nowInBrowserTz.getTime() - nowInTargetTz.getTime();
-          
-          // Adjust the date to account for timezone difference
-          return new Date(localDate.getTime() + offsetMs);
-        };
-
-        // Process prayer times - API returns times in the specified timezone
+        // Process prayer times - API returns times already in the specified timezone
+        // Get current time in user's timezone for comparison
+        const nowInUserTz = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
+        const currentHour = nowInUserTz.getHours();
+        const currentMinute = nowInUserTz.getMinutes();
+        const currentTimeMinutes = currentHour * 60 + currentMinute;
+        
         const processedPrayers = prayers.map((prayer, index) => {
           const [hours, minutes] = prayer.time.split(":").map(Number);
+          const prayerTimeMinutes = hours * 60 + minutes;
           
-          // Create prayer time date in user's timezone
-          let prayerTime = createDateInTimezone(hours, minutes, userTimezone);
+          // Check if prayer has passed today (in user's timezone)
+          const passed = prayerTimeMinutes < currentTimeMinutes;
           
-          // If prayer time has passed today, set it for tomorrow
-          if (prayerTime < now) {
+          // For countdown calculation, create a Date object
+          // Get today's date in user's timezone
+          const year = nowInUserTz.getFullYear();
+          const month = nowInUserTz.getMonth();
+          const day = nowInUserTz.getDate();
+          
+          // Create date string for prayer time
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+          
+          // Calculate timezone offset to convert to proper Date object
+          const browserNow = new Date();
+          const browserTzStr = browserNow.toLocaleString("en-US");
+          const userTzStr = browserNow.toLocaleString("en-US", { timeZone: userTimezone });
+          const browserDate = new Date(browserTzStr);
+          const userDate = new Date(userTzStr);
+          const offsetMs = browserDate.getTime() - userDate.getTime();
+          
+          // Create prayer time date
+          let prayerTime = new Date(new Date(dateStr).getTime() + offsetMs);
+          
+          // If passed, set for tomorrow
+          if (passed) {
             prayerTime = new Date(prayerTime);
             prayerTime.setDate(prayerTime.getDate() + 1);
-          }
-
-          const passed = prayerTime < now;
-          const isNext = !passed && (nextPrayerIndex === -1 || prayerTime < prayers[nextPrayerIndex >= 0 ? nextPrayerIndex : index].time);
-
-          if (isNext) {
-            nextPrayerIndex = index;
           }
 
           return {
@@ -556,15 +712,32 @@ const Quran = () => {
             time: prayer.time,
             timeObj: prayerTime,
             passed,
-            next: isNext,
+            next: false, // Will be set below
             timeRemaining: "",
           };
         });
 
+        // Find the next prayer - either the first upcoming prayer today, or Fajr tomorrow if all passed
+        let actualNextPrayerIndex = -1;
+        const upcomingToday = processedPrayers.filter((p, i) => !p.passed);
+        
+        if (upcomingToday.length > 0) {
+          // There are prayers remaining today - find the earliest one
+          const earliestToday = upcomingToday.reduce((earliest, current) => {
+            const earliestMinutes = parseInt(earliest.time.split(":")[0]) * 60 + parseInt(earliest.time.split(":")[1]);
+            const currentMinutes = parseInt(current.time.split(":")[0]) * 60 + parseInt(current.time.split(":")[1]);
+            return currentMinutes < earliestMinutes ? current : earliest;
+          });
+          actualNextPrayerIndex = processedPrayers.findIndex(p => p.name === earliestToday.name && p.time === earliestToday.time);
+        } else {
+          // All prayers passed today - next prayer is Fajr tomorrow (index 0)
+          actualNextPrayerIndex = 0;
+        }
+
         // Mark all as not next except the actual next one
         const finalPrayers = processedPrayers.map((p, i) => ({
           ...p,
-          next: i === nextPrayerIndex,
+          next: i === actualNextPrayerIndex,
         }));
 
         setPrayerTimes(finalPrayers);
@@ -631,7 +804,25 @@ const Quran = () => {
 
   const hijri = toHijri(currentDate);
   const nextPrayer = prayerTimes.find(p => p.next);
-  const currentVerses = getVerses();
+  const [currentVerses, setCurrentVerses] = useState<{
+    sura: string;
+    verses: Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }>;
+    suraNumber?: number;
+    totalVerses?: number;
+    surasOnPage?: Array<{ number: number; name: string }>;
+  }>({
+    sura: "",
+    verses: [],
+  });
+
+  // Load verses when page changes
+  useEffect(() => {
+    const loadVerses = async () => {
+      const verses = await getVerses();
+      setCurrentVerses(verses);
+    };
+    loadVerses();
+  }, [currentPage]);
 
   const generateCalendarDays = () => {
     const year = currentDate.getFullYear();
@@ -759,13 +950,13 @@ const Quran = () => {
                           <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
                           <p className="text-lg text-muted-foreground">
                             {(() => {
-                              const [hours, minutes] = nextPrayer.time.split(":").map(Number);
-                              const timeFormat = localStorage.getItem("timeFormat") || "24";
-                              if (timeFormat === "12") {
-                                const period = hours >= 12 ? "PM" : "AM";
-                                const displayHours = hours % 12 || 12;
+                const [hours, minutes] = nextPrayer.time.split(":").map(Number);
+                const timeFormat = localStorage.getItem("timeFormat") || "24";
+                if (timeFormat === "12") {
+                  const period = hours >= 12 ? "PM" : "AM";
+                  const displayHours = hours % 12 || 12;
                                 return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
-                              }
+                }
                               return nextPrayer.time;
                             })()}
                           </p>
@@ -798,33 +989,33 @@ const Quran = () => {
                                 seconds = secMatch ? parseInt(secMatch[1]) : 0;
                               }
                               
-                              return (
+                return (
                                 <div className="flex items-center justify-center gap-3">
                                   {hours > 0 && (
                                     <div className="flex flex-col items-center">
                                       <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
                                         <p className="text-3xl font-bold text-primary tabular-nums">{String(hours).padStart(2, '0')}</p>
-                                      </div>
+                      </div>
                                       <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "ساعة" : "Hours"}</p>
-                                    </div>
-                                  )}
+                          </div>
+                        )}
                                   {hours > 0 && <span className="text-2xl font-bold text-primary">:</span>}
                                   <div className="flex flex-col items-center">
                                     <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
                                       <p className="text-3xl font-bold text-primary tabular-nums">{String(minutes).padStart(2, '0')}</p>
-                                    </div>
+                      </div>
                                     <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "دقيقة" : "Minutes"}</p>
-                                  </div>
+                    </div>
                                   <span className="text-2xl font-bold text-primary">:</span>
                                   <div className="flex flex-col items-center">
                                     <div className="bg-primary/20 rounded-xl px-4 py-3 border-2 border-primary/30">
                                       <p className="text-3xl font-bold text-primary tabular-nums animate-pulse">{String(seconds).padStart(2, '0')}</p>
-                                    </div>
+                      </div>
                                     <p className="text-[10px] text-muted-foreground mt-1">{isRTL ? "ثانية" : "Seconds"}</p>
-                                  </div>
-                                </div>
-                              );
-                            })()}
+                    </div>
+                  </div>
+                );
+              })()}
                           </div>
                         </div>
                       ) : (
@@ -840,45 +1031,6 @@ const Quran = () => {
                   )}
                 </div>
               </div>
-
-              {/* Next Prayer Highlight Card */}
-              {nextPrayer && (() => {
-                const [hours, minutes] = nextPrayer.time.split(":").map(Number);
-                const timeFormat = localStorage.getItem("timeFormat") || "24";
-                let displayTime = nextPrayer.time;
-                if (timeFormat === "12") {
-                  const period = hours >= 12 ? "PM" : "AM";
-                  const displayHours = hours % 12 || 12;
-                  displayTime = `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
-                }
-                return (
-                  <div className="bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl p-5 border-2 border-primary/30 shadow-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground mb-1">{isRTL ? "الصلاة القادمة" : "Next Prayer"}</p>
-                        <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
-                      </div>
-                      <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center relative">
-                        <Clock className="w-8 h-8 text-primary animate-pulse" />
-                        {nextPrayer.timeRemaining && (
-                          <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                            {nextPrayer.timeRemaining}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-left">
-                        <span className="text-4xl font-bold text-primary">{displayTime}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">{isRTL ? "باقي" : "Time remaining"}</p>
-                        <p className="text-lg font-semibold">{nextPrayer.timeRemaining || (isRTL ? "جاري الحساب..." : "Calculating...")}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* Prayer Times Grid with Clocks */}
               <div className="grid grid-cols-2 gap-3">
@@ -1059,43 +1211,125 @@ const Quran = () => {
           </div>
 
           {/* Reader */}
-          <div className="bg-card rounded-2xl p-5 border border-border text-center space-y-4">
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
-                <Bookmark className="w-4 h-4 ml-1" /> {isRTL ? "حفظ" : "Bookmark"}
-              </Button>
-              <div>
-                <h3 className="text-xl font-bold">
-                  {isRTL ? "سورة" : "Sura"} {currentVerses.sura}
-                  {currentVerses.suraNumber && (
-                    <span className="text-sm text-muted-foreground mr-2">
-                      ({currentVerses.suraNumber})
-                    </span>
-                  )}
-                </h3>
-                <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            {/* Header Section - Sura Info (Traditional Quran Style) */}
+            {currentVerses.suraNumber && (
+              <div className="bg-teal-500 dark:bg-teal-600 text-white p-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="border-l border-white/30 pl-4">
+                    <p className="text-xs opacity-90 mb-1">{isRTL ? "ركوعاتها" : "Ruku's"}</p>
+                    <p className="text-lg font-bold">1</p>
+                  </div>
+                  <div className="border-l border-r border-white/30 px-4">
+                    <p className="text-xs opacity-90 mb-1">
+                      {currentVerses.suraNumber} {currentVerses.sura} {isRTL ? "(مكية)" : "(Meccan)"} {currentPage}
+                    </p>
+                    {currentVerses.verses.some(v => v.isBismillah) && currentVerses.suraNumber !== 9 && (
+                      <p className="text-2xl font-bold mt-2 text-teal-100">
+                        بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+                      </p>
+                    )}
+                  </div>
+                  <div className="border-r border-white/30 pr-4">
+                    <p className="text-xs opacity-90 mb-1">{isRTL ? "آياتها" : "Verses"}</p>
+                    <p className="text-lg font-bold">
+                      {currentVerses.verses.filter(v => !v.isBismillah && v.number > 0).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
+                  <Bookmark className="w-4 h-4 ml-1" /> {isRTL ? "حفظ" : "Bookmark"}
+                </Button>
+                <div className="text-center">
                   <p className="text-xs text-muted-foreground">
                     {isRTL ? "صفحة" : "Page"} {currentPage} / 604
                   </p>
-                  {currentVerses.totalVerses && (
-                    <>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <p className="text-xs text-muted-foreground">
-                        {isRTL ? "آيات" : "Verses"}: {currentVerses.totalVerses}
-                      </p>
-                    </>
-                  )}
                 </div>
               </div>
-            </div>
-            <div className="bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl p-6 space-y-4 text-lg leading-loose min-h-[300px] flex flex-col justify-center" style={{ fontFamily: "'Traditional Arabic', serif" }}>
-              {currentVerses.verses.map((v, i) => (
-                <p key={i} className={i === 0 ? "text-2xl font-bold text-primary mb-4" : i === 1 ? "text-xl font-semibold mb-3" : "text-base"}>
-                  {v}
-                </p>
-              ))}
-            </div>
-            <div className="flex items-center justify-center gap-4">
+            {loadingVerses ? (
+              <div className="bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl p-6 min-h-[300px] flex flex-col items-center justify-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-sm text-muted-foreground">{isRTL ? "جاري تحميل الآيات..." : "Loading verses..."}</p>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-b from-sky-50/50 via-background to-sky-50/30 dark:from-sky-950/20 dark:via-background dark:to-sky-950/10 min-h-[500px] p-6" style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arial', serif", direction: "rtl", textAlign: "right" }}>
+                {currentVerses.verses.length > 0 ? (
+                  <div className="space-y-1">
+                    {/* Show Bismillah first if it exists - decorative header, NO verse number (except surah 9) */}
+                    {currentVerses.verses.filter(v => v.isBismillah && currentVerses.suraNumber !== 9).map((verse, i) => (
+                      <div key={`bismillah-${i}`} className="text-center py-4 mb-4 border-b-2 border-teal-200/30 dark:border-teal-800/30">
+                        <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 leading-relaxed" style={{ letterSpacing: "0.1em", fontVariantLigatures: "normal" }}>
+                          {verse.text}
+                        </p>
+                      </div>
+                    ))}
+                    
+                    {/* Show regular verses with numbers starting from (1) - ONLY actual verses, not Bismillah */}
+                    {(() => {
+                      const verses = currentVerses.verses.filter(v => !v.isBismillah && v.number > 0);
+                      const surahNumber = currentVerses.suraNumber || 0;
+                      
+                      // SPECIAL CASE - Surah Al-Fatiha (surah 1): Keep Bismillah as verse 1
+                      // SPECIAL CASE - Surah Al-Baqara and others (surah != 1 and != 9): Filter out Bismillah
+                      const filteredVerses = verses
+                        .filter(verse => {
+                          // For Surah 1: Keep all verses including Bismillah
+                          if (surahNumber === 1) {
+                            return true;
+                          }
+                          // For Surah 9: Keep all verses (no Bismillah logic)
+                          if (surahNumber === 9) {
+                            return true;
+                          }
+                          // For all other surahs: Filter out Bismillah
+                          return !verse.text.includes('بِسْمِ');
+                        })
+                        .map((verse, index) => ({
+                          ...verse,
+                          displayNumber: index + 1  // renumber from 1
+                        }));
+                      
+                      return filteredVerses.map((verse, i) => {
+                        // Safety check: Remove any Bismillah that might have slipped through (except for Surah 1)
+                        let cleanText = verse.text;
+                        if (surahNumber !== 1) {
+                          const bismillahInText = /بِسْمِ\s*[اللّاللَّ]هِ\s*الر['َّ]حْم[َنَٰ]نِ\s*الر['َّ]حِيمِ/gi;
+                          if (bismillahInText.test(cleanText)) {
+                            cleanText = cleanText.replace(bismillahInText, '').trim();
+                            cleanText = cleanText.replace(/\s+/g, ' ').trim();
+                            cleanText = cleanText.replace(/^[،\s]+|[،\s]+$/g, '').trim();
+                          }
+                        }
+                        
+                        return (
+                          <div key={`verse-${verse.suraNumber}-${verse.displayNumber}-${i}`} className="relative mb-2 pb-2 border-b border-sky-200/30 dark:border-sky-800/20 last:border-0">
+                            <p className="text-xl leading-[2.8] text-foreground/95 text-right" style={{ 
+                              lineHeight: "2.8", 
+                              wordSpacing: "0.2em",
+                              fontVariantLigatures: "normal",
+                              fontFeatureSettings: '"liga" 1, "kern" 1',
+                              textRendering: "optimizeLegibility"
+                            }}>
+                              {cleanText}
+                              <span className="text-teal-600 dark:text-teal-400 font-semibold mr-1">
+                                ({verse.displayNumber})
+                              </span>
+                            </p>
+                          </div>
+                        );
+                      })})()}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">{isRTL ? "لا توجد آيات متاحة" : "No verses available"}</p>
+                )}
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-4 mt-4">
               <Button
                 variant="outline"
                 size="sm"
@@ -1106,9 +1340,9 @@ const Quran = () => {
                 {isRTL ? "السابق" : "Previous"}
               </Button>
               <div className="flex flex-col items-center gap-1">
-              <span className="text-sm text-muted-foreground font-semibold">
-                {currentPage} / 604
-              </span>
+                <span className="text-sm text-muted-foreground font-semibold">
+                  {currentPage} / 604
+                </span>
                 {currentVerses.suraNumber && (
                   <span className="text-xs text-muted-foreground">
                     {isRTL ? "سورة" : "Sura"} {currentVerses.suraNumber}
@@ -1124,6 +1358,7 @@ const Quran = () => {
                 {isRTL ? "التالي" : "Next"}
                 <ChevronLeft className="w-4 h-4 mr-1" />
               </Button>
+            </div>
             </div>
           </div>
         </TabsContent>
@@ -1299,7 +1534,7 @@ const Quran = () => {
               <p className="text-muted-foreground mb-4">
                 {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
               </p>
-              <CreateTaskDialog category="quran" />
+              <CreateTaskDialog category="quran" selectedDate={selectedDate} />
             </div>
           ) : (
             <>
@@ -1352,7 +1587,7 @@ const Quran = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <EditTaskDialog task={task} />
+                        <EditTaskDialog task={task} selectedDate={selectedDate} />
                         <button
                           onClick={() => deleteTask(task.id)}
                           className="text-muted-foreground hover:text-destructive shrink-0"

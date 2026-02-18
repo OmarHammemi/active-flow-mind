@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,13 +23,26 @@ const Knowledge = () => {
   const { isRTL } = useLanguage();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const [books, setBooks] = useState<Book[]>([
-    { id: "1", title: "العادات الذرية", author: "جيمس كلير", currentPage: 45, totalPages: 320 },
-    { id: "2", title: "فن اللامبالاة", author: "مارك مانسون", currentPage: 0, totalPages: 224 },
-  ]);
+  // Load books from localStorage
+  const [books, setBooks] = useState<Book[]>(() => {
+    const saved = localStorage.getItem('knowledge_books');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [newBookTitle, setNewBookTitle] = useState("");
   const [newBookAuthor, setNewBookAuthor] = useState("");
   const [newBookPages, setNewBookPages] = useState("");
+
+  // Save books to localStorage whenever books change
+  useEffect(() => {
+    localStorage.setItem('knowledge_books', JSON.stringify(books));
+  }, [books]);
 
   // Filter tasks for knowledge category and current date
   const knowledgeTasks = useMemo(() => {
@@ -82,14 +95,18 @@ const Knowledge = () => {
   };
 
   const addBook = () => {
-    if (!newBookTitle.trim()) return;
-    setBooks([...books, {
+    if (!newBookTitle.trim()) {
+      // Show error if title is empty
+      return;
+    }
+    const newBook: Book = {
       id: Date.now().toString(),
-      title: newBookTitle,
-      author: newBookAuthor,
+      title: newBookTitle.trim(),
+      author: newBookAuthor.trim() || (isRTL ? "مؤلف غير معروف" : "Unknown Author"),
       currentPage: 0,
-      totalPages: parseInt(newBookPages) || 100,
-    }]);
+      totalPages: Math.max(1, parseInt(newBookPages) || 100),
+    };
+    setBooks([...books, newBook]);
     setNewBookTitle("");
     setNewBookAuthor("");
     setNewBookPages("");
@@ -161,7 +178,7 @@ const Knowledge = () => {
               <p className="text-muted-foreground mb-4">
                 {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
               </p>
-              <CreateTaskDialog category="knowledge" />
+              <CreateTaskDialog category="knowledge" selectedDate={selectedDate} />
             </div>
           ) : (
             <>
@@ -214,7 +231,7 @@ const Knowledge = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <EditTaskDialog task={task} />
+                        <EditTaskDialog task={task} selectedDate={selectedDate} />
                         <button
                           onClick={() => deleteTask(task.id)}
                           className="text-muted-foreground hover:text-destructive shrink-0"
@@ -261,12 +278,26 @@ const Knowledge = () => {
                 <span className="text-xs font-semibold text-pink-500">{Math.round((book.currentPage / book.totalPages) * 100)}%</span>
               </div>
               <div className="flex gap-2 items-center">
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => updateBookProgress(book.id, book.currentPage + 10)}>+10 صفحات</Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-xs" 
+                  onClick={() => updateBookProgress(book.id, Math.min(book.currentPage + 10, book.totalPages))}
+                  disabled={book.currentPage >= book.totalPages}
+                >
+                  +10 {isRTL ? "صفحات" : "pages"}
+                </Button>
                 <Input
                   type="number"
-                  placeholder="الصفحة الحالية"
+                  placeholder={isRTL ? "الصفحة الحالية" : "Current page"}
                   className="text-right text-xs h-8"
-                  onChange={(e) => updateBookProgress(book.id, parseInt(e.target.value) || 0)}
+                  value={book.currentPage || ""}
+                  min={0}
+                  max={book.totalPages}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    updateBookProgress(book.id, Math.max(0, Math.min(value, book.totalPages)));
+                  }}
                 />
               </div>
             </div>
@@ -274,14 +305,40 @@ const Knowledge = () => {
 
           {/* Add book */}
           <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
-            <h4 className="font-semibold text-right">إضافة كتاب جديد</h4>
-            <Input value={newBookTitle} onChange={(e) => setNewBookTitle(e.target.value)} placeholder="عنوان الكتاب..." className="text-right" />
+            <h4 className="font-semibold text-right">{isRTL ? "إضافة كتاب جديد" : "Add New Book"}</h4>
+            <Input 
+              value={newBookTitle} 
+              onChange={(e) => setNewBookTitle(e.target.value)} 
+              placeholder={isRTL ? "عنوان الكتاب..." : "Book title..."} 
+              className="text-right"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newBookTitle.trim()) {
+                  addBook();
+                }
+              }}
+            />
             <div className="flex gap-2">
-              <Input value={newBookPages} onChange={(e) => setNewBookPages(e.target.value)} placeholder="عدد الصفحات" type="number" className="w-28 text-right" />
-              <Input value={newBookAuthor} onChange={(e) => setNewBookAuthor(e.target.value)} placeholder="المؤلف..." className="text-right" />
+              <Input 
+                value={newBookPages} 
+                onChange={(e) => setNewBookPages(e.target.value)} 
+                placeholder={isRTL ? "عدد الصفحات" : "Total pages"} 
+                type="number" 
+                min="1"
+                className="w-28 text-right" 
+              />
+              <Input 
+                value={newBookAuthor} 
+                onChange={(e) => setNewBookAuthor(e.target.value)} 
+                placeholder={isRTL ? "المؤلف..." : "Author..."} 
+                className="text-right flex-1" 
+              />
             </div>
-            <Button onClick={addBook} className="w-full">
-              <Plus className="w-4 h-4 ml-1" /> إضافة كتاب
+            <Button 
+              onClick={addBook} 
+              className="w-full"
+              disabled={!newBookTitle.trim()}
+            >
+              <Plus className="w-4 h-4 ml-1" /> {isRTL ? "إضافة كتاب" : "Add Book"}
             </Button>
           </div>
         </TabsContent>

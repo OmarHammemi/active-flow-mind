@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dumbbell, Flame, Scale, Plus, Trash2, Check, X, Circle, CheckCircle2, Clock, Calendar } from "lucide-react";
+import { Dumbbell, Flame, Scale, Plus, Trash2, Check, X, Circle, CheckCircle2, Clock, Calendar, Wind, Play, Pause, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts";
 import { useTasks } from "@/contexts/TaskContext";
@@ -45,10 +45,73 @@ const Sport = () => {
   const [newWeight, setNewWeight] = useState("");
   const [weightPeriod, setWeightPeriod] = useState<'week' | '2weeks' | 'month' | '3months' | '6months' | 'year'>('month');
 
+  // Breather state
+  const [isBreathing, setIsBreathing] = useState(false);
+  const [breathPhase, setBreathPhase] = useState<'inhale' | 'hold' | 'exhale' | 'pause'>('inhale');
+  const [timeRemaining, setTimeRemaining] = useState(4);
+  const [cycleCount, setCycleCount] = useState(0);
+  
+  // Breathing timing (in seconds)
+  const breathingTimings = {
+    inhale: 4,
+    hold: 4,
+    exhale: 4,
+    pause: 2,
+  };
+
   // Save weight entries to localStorage
   useEffect(() => {
     localStorage.setItem('weight_entries', JSON.stringify(weightEntries));
   }, [weightEntries]);
+
+  // Breathing exercise timer
+  useEffect(() => {
+    if (!isBreathing) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Move to next phase
+          if (breathPhase === 'inhale') {
+            setBreathPhase('hold');
+            return breathingTimings.hold;
+          } else if (breathPhase === 'hold') {
+            setBreathPhase('exhale');
+            return breathingTimings.exhale;
+          } else if (breathPhase === 'exhale') {
+            setBreathPhase('pause');
+            return breathingTimings.pause;
+          } else {
+            // Complete cycle, start over
+            setCycleCount((c) => c + 1);
+            setBreathPhase('inhale');
+            return breathingTimings.inhale;
+          }
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isBreathing, breathPhase]);
+
+  const startBreathing = () => {
+    setIsBreathing(true);
+    setBreathPhase('inhale');
+    setTimeRemaining(breathingTimings.inhale);
+    setCycleCount(0);
+  };
+
+  const stopBreathing = () => {
+    setIsBreathing(false);
+    setBreathPhase('inhale');
+    setTimeRemaining(breathingTimings.inhale);
+  };
+
+  const resetBreathing = () => {
+    stopBreathing();
+    setCycleCount(0);
+  };
 
   // Filter weight entries based on selected period
   const filteredWeightEntries = useMemo(() => {
@@ -220,17 +283,140 @@ const Sport = () => {
       </div>
 
       <Tabs defaultValue="tasks" className="px-4">
-        <TabsList className="w-full bg-card border border-border">
-          <TabsTrigger value="weight" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Scale className="w-3.5 h-3.5 ml-1" /> تتبع الوزن
+        <TabsList className="w-full bg-card border border-border grid grid-cols-4">
+          <TabsTrigger value="breather" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Wind className="w-3.5 h-3.5 ml-1" /> {isRTL ? "التنفس" : "Breather"}
           </TabsTrigger>
-          <TabsTrigger value="calories" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Flame className="w-3.5 h-3.5 ml-1" /> السعرات
+          <TabsTrigger value="weight" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Scale className="w-3.5 h-3.5 ml-1" /> {isRTL ? "تتبع الوزن" : "Weight"}
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Dumbbell className="w-3.5 h-3.5 ml-1" /> التمارين
+          <TabsTrigger value="calories" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Flame className="w-3.5 h-3.5 ml-1" /> {isRTL ? "السعرات" : "Calories"}
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Dumbbell className="w-3.5 h-3.5 ml-1" /> {isRTL ? "التمارين" : "Exercises"}
           </TabsTrigger>
         </TabsList>
+
+        {/* Breather Tab */}
+        <TabsContent value="breather" className="space-y-4 mt-4">
+          <div className="bg-card rounded-2xl p-6 border border-border">
+            <div className="text-center space-y-6">
+              <div>
+                <h3 className="text-xl font-bold mb-2">{isRTL ? "تمرين التنفس" : "Breathing Exercise"}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isRTL ? "خذ نفساً عميقاً واسترخِ" : "Take a deep breath and relax"}
+                </p>
+              </div>
+
+              {/* Breathing Circle Animation */}
+              <div className="flex items-center justify-center">
+                <div className="relative w-64 h-64 flex items-center justify-center">
+                  {/* Outer circle - animated */}
+                  <div
+                    className={`absolute rounded-full border-4 transition-all duration-1000 ease-in-out ${
+                      breathPhase === 'inhale'
+                        ? 'border-primary bg-primary/20 scale-150'
+                        : breathPhase === 'exhale'
+                        ? 'border-primary/30 bg-primary/5 scale-75'
+                        : 'border-primary/50 bg-primary/10 scale-100'
+                    }`}
+                    style={{
+                      width: breathPhase === 'inhale' ? '100%' : breathPhase === 'exhale' ? '60%' : '80%',
+                      height: breathPhase === 'inhale' ? '100%' : breathPhase === 'exhale' ? '60%' : '80%',
+                    }}
+                  />
+                  {/* Middle circle */}
+                  <div
+                    className={`absolute rounded-full border-2 transition-all duration-1000 ease-in-out ${
+                      breathPhase === 'inhale'
+                        ? 'border-primary/60 bg-primary/10 scale-125'
+                        : breathPhase === 'exhale'
+                        ? 'border-primary/20 bg-primary/5 scale-70'
+                        : 'border-primary/40 bg-primary/8 scale-90'
+                    }`}
+                    style={{
+                      width: breathPhase === 'inhale' ? '80%' : breathPhase === 'exhale' ? '50%' : '65%',
+                      height: breathPhase === 'inhale' ? '80%' : breathPhase === 'exhale' ? '50%' : '65%',
+                    }}
+                  />
+                  {/* Inner circle - timer display */}
+                  <div className="absolute rounded-full bg-background border-2 border-primary/30 w-32 h-32 flex flex-col items-center justify-center z-10">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {breathPhase === 'inhale' 
+                        ? (isRTL ? 'شهيق' : 'Inhale')
+                        : breathPhase === 'hold'
+                        ? (isRTL ? 'احتفظ' : 'Hold')
+                        : breathPhase === 'exhale'
+                        ? (isRTL ? 'زفير' : 'Exhale')
+                        : (isRTL ? 'استراحة' : 'Pause')
+                      }
+                    </p>
+                    <p className="text-3xl font-bold text-primary tabular-nums">
+                      {timeRemaining}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cycle Counter */}
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  {isRTL ? "عدد الدورات" : "Cycles"}
+                </p>
+                <p className="text-2xl font-bold text-primary">
+                  {cycleCount}
+                </p>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-3">
+                {!isBreathing ? (
+                  <Button
+                    onClick={startBreathing}
+                    size="lg"
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    <Play className="w-5 h-5 ml-2" />
+                    {isRTL ? "ابدأ" : "Start"}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={stopBreathing}
+                      size="lg"
+                      variant="outline"
+                    >
+                      <Pause className="w-5 h-5 ml-2" />
+                      {isRTL ? "إيقاف" : "Pause"}
+                    </Button>
+                    <Button
+                      onClick={resetBreathing}
+                      size="lg"
+                      variant="outline"
+                    >
+                      <RotateCcw className="w-5 h-5 ml-2" />
+                      {isRTL ? "إعادة" : "Reset"}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-muted/30 rounded-xl p-4 text-right space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {isRTL ? "التعليمات:" : "Instructions:"}
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>{isRTL ? "شهيق لمدة 4 ثوانٍ" : "Inhale for 4 seconds"}</li>
+                  <li>{isRTL ? "احتفظ بالنفس لمدة 4 ثوانٍ" : "Hold for 4 seconds"}</li>
+                  <li>{isRTL ? "زفير لمدة 4 ثوانٍ" : "Exhale for 4 seconds"}</li>
+                  <li>{isRTL ? "استراحة لمدة ثانيتين" : "Pause for 2 seconds"}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-3 mt-4">
@@ -255,7 +441,7 @@ const Sport = () => {
               <p className="text-muted-foreground mb-4">
                 {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
               </p>
-              <CreateTaskDialog category="sport" />
+              <CreateTaskDialog category="sport" selectedDate={selectedDate} />
             </div>
           ) : (
             <>
@@ -308,7 +494,7 @@ const Sport = () => {
               </div>
               </div>
                       <div className="flex items-center gap-1">
-                        <EditTaskDialog task={task} />
+                        <EditTaskDialog task={task} selectedDate={selectedDate} />
               <button
                           onClick={() => deleteTask(task.id)}
                           className="text-muted-foreground hover:text-destructive shrink-0"

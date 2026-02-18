@@ -116,7 +116,7 @@ const Work = () => {
             <p className="text-muted-foreground mb-4">
               {isRTL ? "لا توجد مهام لهذا اليوم" : "No tasks for today"}
             </p>
-            <CreateTaskDialog category="work" />
+            <CreateTaskDialog category="work" selectedDate={selectedDate} />
             </div>
         ) : (
           <>
@@ -169,7 +169,7 @@ const Work = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <EditTaskDialog task={task} />
+                      <EditTaskDialog task={task} selectedDate={selectedDate} />
                       <button
                         onClick={() => deleteTask(task.id)}
                         className="text-muted-foreground hover:text-destructive shrink-0"

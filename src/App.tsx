@@ -62,7 +62,7 @@ const App = () => (
                   path="/dashboard"
                   element={
                     <AppLayout>
-                      <Index />
+                        <Index />
                     </AppLayout>
                   }
                 />
@@ -70,7 +70,7 @@ const App = () => (
                   path="/quran"
                   element={
                     <AppLayout>
-                      <Quran />
+                        <Quran />
                     </AppLayout>
                   }
                 />
@@ -78,7 +78,7 @@ const App = () => (
                   path="/work"
                   element={
                     <AppLayout>
-                      <Work />
+                        <Work />
                     </AppLayout>
                   }
                 />
@@ -86,7 +86,7 @@ const App = () => (
                   path="/sport"
                   element={
                     <AppLayout>
-                      <Sport />
+                        <Sport />
                     </AppLayout>
                   }
                 />
@@ -94,7 +94,7 @@ const App = () => (
                   path="/knowledge"
                   element={
                     <AppLayout>
-                      <Knowledge />
+                        <Knowledge />
                     </AppLayout>
                   }
                 />
@@ -102,7 +102,7 @@ const App = () => (
                   path="/profile"
                   element={
                     <AppLayout>
-                      <Profile />
+                        <Profile />
                     </AppLayout>
                   }
                 />

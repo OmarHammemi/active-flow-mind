@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Slider } from "@/components/ui/slider";
 interface CreateTaskDialogProps {
   category: 'work' | 'sport' | 'knowledge' | 'quran' | 'other';
   trigger?: React.ReactNode;
+  selectedDate?: Date; // Date to filter tasks for importance calculation
 }
 
 const weekDays = [
@@ -32,7 +33,7 @@ const weekDays = [
   { value: 6, label: "السبت" },
 ];
 
-export default function CreateTaskDialog({ category, trigger }: CreateTaskDialogProps) {
+export default function CreateTaskDialog({ category, trigger, selectedDate = new Date() }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,18 +51,73 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
   // One-time schedule
   const [oneTimeDate, setOneTimeDate] = useState<Date>(new Date());
   
-  // Importance percentage
+  // Importance percentage - will be clamped based on remaining importance
   const [importance, setImportance] = useState<number[]>([10]);
 
-  const { createTask, tasks } = useTasks();
+  const { createTask, tasks, getTasksForDate } = useTasks();
   const { isRTL } = useLanguage();
   const { toast } = useToast();
+  
+  // Calculate importance limits whenever dialog opens or tasks change
+  // Only count tasks for the selected date (each day has its own 100%)
+  useEffect(() => {
+    if (!open) return;
+    
+    // Get tasks for the selected date, then filter by category
+    const dateTasks = getTasksForDate(selectedDate);
+    const currentCategoryTasks = dateTasks.filter(t => t.category === category);
+    const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => {
+      let imp = t.importance;
+      
+      // Handle string numbers (convert "10" to 10)
+      if (typeof imp === 'string') {
+        imp = parseFloat(imp);
+      }
+      
+      if (typeof imp === 'number' && !isNaN(imp) && imp >= 0 && imp <= 100) {
+        return sum + imp;
+      }
+      return sum;
+    }, 0);
+    const remainingImportance = Math.max(0, 100 - currentTotalImportance);
+    
+    // Always update importance based on remaining
+    setImportance(prev => {
+      if (remainingImportance <= 0) {
+        return [0]; // Must be 0 when no remaining
+      } else if (prev[0] > remainingImportance) {
+        return [remainingImportance]; // Clamp to remaining
+      } else if (prev[0] < 1) {
+        return [Math.min(1, remainingImportance)]; // Minimum 1 if there's remaining
+      }
+      // If current value is valid, keep it (but ensure it doesn't exceed remaining)
+      return [Math.min(prev[0], remainingImportance)];
+    });
+  }, [open, tasks, category, selectedDate, getTasksForDate]);
 
   // Calculate current total importance for this category
-  const currentCategoryTasks = tasks.filter(t => t.category === category);
-  const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => sum + (t.importance || 0), 0);
-  const remainingImportance = 100 - currentTotalImportance;
-  const maxImportance = Math.min(remainingImportance + (importance[0] || 0), 100);
+  // Only count tasks for the selected date (each day has its own 100%)
+  // Only count tasks that have a valid importance value (0-100)
+  const dateTasks = getTasksForDate(selectedDate);
+  const currentCategoryTasks = dateTasks.filter(t => t.category === category);
+  const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => {
+    let imp = t.importance;
+    
+    // Handle string numbers (convert "10" to 10)
+    if (typeof imp === 'string') {
+      imp = parseFloat(imp);
+    }
+    
+    // Only count if importance is a valid number between 0 and 100
+    if (typeof imp === 'number' && !isNaN(imp) && imp >= 0 && imp <= 100) {
+      return sum + imp;
+    }
+    
+    // If importance is undefined, null, or invalid, count as 0 (not 100!)
+    return sum;
+  }, 0);
+  const remainingImportance = Math.max(0, 100 - currentTotalImportance);
+  const maxImportance = Math.max(1, remainingImportance); // Max should be remaining, minimum 1
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -84,6 +140,15 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
       return;
     }
 
+    if (remainingImportance <= 0) {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: isRTL ? "لا توجد أهمية متبقية. يجب حذف أو تعديل المهام الموجودة أولاً." : "No remaining importance. Please delete or edit existing tasks first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (currentTotalImportance + importanceValue > 100) {
       toast({
         title: isRTL ? "خطأ" : "Error",
@@ -98,7 +163,7 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
       description: description.trim() || undefined,
       category,
       schedule_type: scheduleType,
-      importance: importanceValue,
+      importance: Math.max(0, Math.min(100, importanceValue)), // Ensure importance is between 0-100
     };
 
     if (scheduleType === 'daily') {
@@ -333,21 +398,42 @@ export default function CreateTaskDialog({ category, trigger }: CreateTaskDialog
                 {isRTL ? "أهمية المهمة" : "Task Importance"}
               </Label>
               <span className="text-sm font-semibold text-primary">
-                {importance[0]}%
+                {remainingImportance <= 0 ? 0 : importance[0]}%
               </span>
             </div>
             <Slider
-              value={importance}
-              onValueChange={setImportance}
-              min={1}
-              max={maxImportance}
+              value={remainingImportance <= 0 ? [0] : importance}
+              onValueChange={(newValue) => {
+                // Ensure the value doesn't exceed remaining importance
+                if (remainingImportance <= 0) {
+                  setImportance([0]);
+                } else {
+                  const clampedValue = Math.min(Math.max(1, newValue[0]), remainingImportance);
+                  setImportance([clampedValue]);
+                }
+              }}
+              min={remainingImportance <= 0 ? 0 : 1}
+              max={Math.max(0, remainingImportance)}
               step={1}
               className="w-full"
+              disabled={remainingImportance <= 0}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{isRTL ? "المتبقي:" : "Remaining:"} {remainingImportance}%</span>
-              <span>{isRTL ? "الإجمالي:" : "Total:"} {currentTotalImportance + importance[0]}%</span>
+              <span>{isRTL ? "الإجمالي:" : "Total:"} {currentTotalImportance + (remainingImportance <= 0 ? 0 : importance[0])}%</span>
             </div>
+            {currentCategoryTasks.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {isRTL 
+                  ? `المهام لهذا اليوم في هذه الفئة: ${currentCategoryTasks.length} (${currentTotalImportance}% مستخدم)` 
+                  : `Tasks for this date in this category: ${currentCategoryTasks.length} (${currentTotalImportance}% used)`}
+              </p>
+            )}
+            {remainingImportance <= 0 && (
+              <p className="text-xs text-destructive">
+                {isRTL ? "تحذير: لا توجد أهمية متبقية. يجب حذف أو تعديل المهام الموجودة أولاً." : "Warning: No remaining importance. Please delete or edit existing tasks first."}
+              </p>
+            )}
             {currentTotalImportance + importance[0] > 100 && (
               <p className="text-xs text-destructive">
                 {isRTL ? "تحذير: الإجمالي يتجاوز 100%" : "Warning: Total exceeds 100%"}

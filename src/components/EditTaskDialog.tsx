@@ -19,6 +19,7 @@ import { Slider } from "@/components/ui/slider";
 interface EditTaskDialogProps {
   task: Task;
   trigger?: React.ReactNode;
+  selectedDate?: Date; // Date to filter tasks for importance calculation
 }
 
 const weekDays = [
@@ -31,7 +32,7 @@ const weekDays = [
   { value: 6, label: "السبت" },
 ];
 
-export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
+export default function EditTaskDialog({ task, trigger, selectedDate = new Date() }: EditTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
@@ -58,15 +59,33 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
   // Importance percentage
   const [importance, setImportance] = useState<number[]>([task.importance || 10]);
 
-  const { updateTask, tasks } = useTasks();
+  const { updateTask, tasks, getTasksForDate } = useTasks();
   const { isRTL } = useLanguage();
   const { toast } = useToast();
 
   // Calculate current total importance for this category (excluding current task)
-  const currentCategoryTasks = tasks.filter(t => t.category === task.category && t.id !== task.id);
-  const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => sum + (t.importance || 0), 0);
-  const remainingImportance = 100 - currentTotalImportance;
-  const maxImportance = Math.min(remainingImportance + (importance[0] || 0), 100);
+  // Only count tasks for the selected date (each day has its own 100%)
+  // Only count tasks that have a valid importance value (0-100)
+  const dateTasks = getTasksForDate(selectedDate);
+  const currentCategoryTasks = dateTasks.filter(t => t.category === task.category && t.id !== task.id);
+  const currentTotalImportance = currentCategoryTasks.reduce((sum, t) => {
+    let imp = t.importance;
+    
+    // Handle string numbers (convert "10" to 10)
+    if (typeof imp === 'string') {
+      imp = parseFloat(imp);
+    }
+    
+    // Only count if importance is a valid number between 0 and 100
+    if (typeof imp === 'number' && !isNaN(imp) && imp >= 0 && imp <= 100) {
+      return sum + imp;
+    }
+    // If importance is undefined, null, or invalid, count as 0
+    return sum;
+  }, 0);
+  const remainingImportance = Math.max(0, 100 - currentTotalImportance);
+  const currentTaskImportance = (typeof task.importance === 'number' && !isNaN(task.importance) && task.importance >= 0 && task.importance <= 100) ? task.importance : 0;
+  const maxImportance = Math.max(1, remainingImportance + currentTaskImportance); // Can use up to remaining + current task's importance
 
   // Reset form when task changes
   useEffect(() => {
@@ -103,10 +122,10 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
       return;
     }
 
-    if (currentTotalImportance + importanceValue > 100) {
+    if (remainingImportance + currentTaskImportance < importanceValue) {
       toast({
         title: isRTL ? "خطأ" : "Error",
-        description: isRTL ? `إجمالي الأهمية يجب أن يكون 100%. المتبقي: ${remainingImportance}%` : `Total importance must be 100%. Remaining: ${remainingImportance}%`,
+        description: isRTL ? `إجمالي الأهمية يجب أن يكون 100%. المتبقي: ${remainingImportance + currentTaskImportance}%` : `Total importance must be 100%. Remaining: ${remainingImportance + currentTaskImportance}%`,
         variant: "destructive",
       });
       return;
@@ -215,18 +234,29 @@ export default function EditTaskDialog({ task, trigger }: EditTaskDialogProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{isRTL ? "الأهمية" : "Importance"}</Label>
-            <div className="flex items-center gap-4">
-              <Slider
-                min={0}
-                max={maxImportance}
-                step={1}
-                value={importance}
-                onValueChange={setImportance}
-                className="flex-1"
-              />
-              <span className="w-12 text-center text-sm font-medium">{importance[0]}%</span>
+          <div className="space-y-2 border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                {isRTL ? "أهمية المهمة" : "Task Importance"}
+              </Label>
+              <span className="text-sm font-semibold text-primary">
+                {importance[0]}%
+              </span>
+            </div>
+            <Slider
+              min={1}
+              max={maxImportance}
+              step={1}
+              value={importance}
+              onValueChange={(newValue) => {
+                const clampedValue = Math.min(Math.max(1, newValue[0]), maxImportance);
+                setImportance([clampedValue]);
+              }}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{isRTL ? "المتبقي:" : "Remaining:"} {remainingImportance + currentTaskImportance}%</span>
+              <span>{isRTL ? "الإجمالي:" : "Total:"} {currentTotalImportance + importance[0]}%</span>
             </div>
             {currentTotalImportance > 0 && (
               <p className="text-xs text-muted-foreground text-right">
