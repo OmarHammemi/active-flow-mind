@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, Clock, Compass, ListTodo, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Circle, CheckCircle2, Bookmark, X, Calendar, Sun, Moon, MoonStar, Heart, Sparkles, Sunrise, Sunset } from "lucide-react";
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { getQuranData, upsertQuranData, upsertUserPreferences, getUserPreferences } from "@/services/database";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
 import EditTaskDialog from "@/components/EditTaskDialog";
 import { format } from "date-fns";
@@ -224,6 +226,7 @@ function toHijri(date: Date) {
 const Quran = () => {
   const { tasks, loading, deleteTask, completeTask, uncompleteTask, getTasksForDate } = useTasks();
   const { isRTL } = useLanguage();
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarType, setCalendarType] = useState<"hijri" | "miladi">("hijri");
   const [currentDate] = useState(new Date());
@@ -311,16 +314,63 @@ const Quran = () => {
   };
 
   // Quran reader state
-  const [currentPage, setCurrentPage] = useState(() => {
-    const saved = localStorage.getItem("quran_last_page");
-    return saved ? parseInt(saved) : 1;
-  });
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedSura, setSelectedSura] = useState<string>("");
   const [goToPage, setGoToPage] = useState("");
-  const [lastRead, setLastRead] = useState(() => {
-    const saved = localStorage.getItem("quran_bookmark");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [lastRead, setLastRead] = useState<{ page: number; sura: number; date: string } | null>(null);
+  const [quranReaderLoading, setQuranReaderLoading] = useState(true);
+
+  // Load Quran reader data from database
+  useEffect(() => {
+    const loadQuranReaderData = async () => {
+      if (!user) {
+        // Fallback to localStorage if not logged in
+        const savedPage = localStorage.getItem("quran_last_page");
+        const savedBookmark = localStorage.getItem("quran_bookmark");
+        setCurrentPage(savedPage ? parseInt(savedPage) : 1);
+        if (savedBookmark) {
+          try {
+            setLastRead(JSON.parse(savedBookmark));
+          } catch {
+            setLastRead(null);
+          }
+        }
+        setQuranReaderLoading(false);
+        return;
+      }
+
+      try {
+        const data = await getQuranData(user.id);
+        if (data) {
+          setCurrentPage(data.last_page || 1);
+          if (data.bookmark) {
+            setLastRead({
+              page: data.bookmark.page,
+              sura: data.bookmark.sura,
+              date: new Date().toLocaleDateString("ar-EG"),
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading quran reader data:', error);
+        // Fallback to localStorage
+        const savedPage = localStorage.getItem("quran_last_page");
+        const savedBookmark = localStorage.getItem("quran_bookmark");
+        setCurrentPage(savedPage ? parseInt(savedPage) : 1);
+        if (savedBookmark) {
+          try {
+            setLastRead(JSON.parse(savedBookmark));
+          } catch {
+            setLastRead(null);
+          }
+        }
+      } finally {
+        setQuranReaderLoading(false);
+      }
+    };
+
+    loadQuranReaderData();
+  }, [user]);
   const [quranVerses, setQuranVerses] = useState<Record<number, { 
     verses: Array<{ text: string; number: number; isBismillah?: boolean; suraNumber?: number }> 
   }>>({});
@@ -341,15 +391,56 @@ const Quran = () => {
     }
   }, [currentPage]);
 
-  // Save current page to localStorage
+  // Save current page to database
   useEffect(() => {
-    localStorage.setItem("quran_last_page", currentPage.toString());
-  }, [currentPage]);
+    if (!user || quranReaderLoading) {
+      // Fallback to localStorage if not logged in
+      localStorage.setItem("quran_last_page", currentPage.toString());
+      return;
+    }
 
-  const saveBookmark = () => {
+    const savePage = async () => {
+      const { error } = await upsertQuranData(user.id, {
+        last_page: currentPage,
+      });
+
+      if (error) {
+        console.error('Error saving page:', error);
+        // Fallback to localStorage
+        localStorage.setItem("quran_last_page", currentPage.toString());
+      } else {
+        // Also save to localStorage as backup
+        localStorage.setItem("quran_last_page", currentPage.toString());
+      }
+    };
+
+    savePage();
+  }, [currentPage, user, quranReaderLoading]);
+
+  const saveBookmark = async () => {
     const currentSura = getCurrentSura();
-    const bookmark = { page: currentPage, sura: currentSura, date: new Date().toLocaleDateString("ar-EG") };
-    localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+    const bookmark = { page: currentPage, sura: currentSura.number, date: new Date().toLocaleDateString("ar-EG") };
+    
+    if (!user) {
+      // Fallback to localStorage if not logged in
+      localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+      setLastRead(bookmark);
+      return;
+    }
+
+    const { error } = await upsertQuranData(user.id, {
+      bookmark: { page: currentPage, sura: currentSura.number, verse: 1 },
+    });
+
+    if (error) {
+      console.error('Error saving bookmark:', error);
+      // Fallback to localStorage
+      localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+    } else {
+      // Also save to localStorage as backup
+      localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+    }
+    
     setLastRead(bookmark);
   };
 
@@ -486,8 +577,8 @@ const Quran = () => {
     
     // Fallback for first two suras
     if (primarySura.number === 1 && sampleVerses[1]) {
-      return {
-        sura: "الفاتحة",
+      return { 
+        sura: "الفاتحة", 
         verses: sampleVerses[1].verses.map((v, i) => ({
           text: v,
           number: i + 1,
@@ -500,8 +591,8 @@ const Quran = () => {
       };
     }
     if (primarySura.number === 2 && sampleVerses[2]) {
-      return {
-        sura: "البقرة",
+      return { 
+        sura: "البقرة", 
         verses: sampleVerses[2].verses.map((v, i) => ({
           text: v,
           number: i + 1,
@@ -515,7 +606,7 @@ const Quran = () => {
     }
     
     // Default fallback
-    return {
+    return { 
       sura: primarySura.name,
       verses: [
         {
@@ -577,8 +668,39 @@ const Quran = () => {
     return detected;
   });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
 
-  // Update timezone when it changes in localStorage
+  // Load user preferences (timezone, location) from database
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user) {
+        setPreferencesLoading(false);
+        return;
+      }
+
+      try {
+        const prefs = await getUserPreferences(user.id);
+        if (prefs) {
+          if (prefs.timezone) {
+            setUserTimezone(prefs.timezone);
+            localStorage.setItem("timezone", prefs.timezone);
+          }
+          if (prefs.location) {
+            setUserLocation(prefs.location);
+            localStorage.setItem("user_location", JSON.stringify(prefs.location));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      } finally {
+        setPreferencesLoading(false);
+      }
+    };
+
+    loadPreferences();
+  }, [user]);
+
+  // Update timezone when it changes in localStorage (for sync with Profile page)
   useEffect(() => {
     const handleStorageChange = () => {
       const tz = localStorage.getItem("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -602,7 +724,12 @@ const Quran = () => {
   
   // Get user location - auto-detect or use saved location
   useEffect(() => {
+    if (preferencesLoading) return; // Wait for preferences to load
+
     const getLocation = async () => {
+      // If we already have location from preferences, use it
+      if (userLocation) return;
+
       const savedLocation = localStorage.getItem("user_location");
       if (savedLocation) {
         try {
@@ -618,28 +745,56 @@ const Quran = () => {
     };
 
     const requestLocation = () => {
-      // Try to get from browser geolocation
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const loc = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            setUserLocation(loc);
-            localStorage.setItem("user_location", JSON.stringify(loc));
+        // Try to get from browser geolocation
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const loc = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              setUserLocation(loc);
+              localStorage.setItem("user_location", JSON.stringify(loc));
+              
+              // Save to database if user is logged in
+              if (user) {
+                try {
+                  await upsertUserPreferences(user.id, { location: loc });
+                } catch (error) {
+                  console.error('Error saving location:', error);
+                }
+              }
+              
             // Also update timezone based on location (optional, but browser timezone is usually better)
             const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (detectedTz && detectedTz !== userTimezone) {
               setUserTimezone(detectedTz);
               localStorage.setItem("timezone", detectedTz);
+              if (user) {
+                try {
+                  await upsertUserPreferences(user.id, { timezone: detectedTz });
+                } catch (error) {
+                  console.error('Error saving timezone:', error);
+                }
+              }
             }
-          },
-          () => {
+            },
+            async () => {
             // If geolocation fails, try to detect timezone and use a default location for that timezone
             const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             // Use Tunisia coordinates as default (since user mentioned Tunisia)
-            setUserLocation({ lat: 36.8065, lng: 10.1815 }); // Tunis, Tunisia
+            const defaultLoc = { lat: 36.8065, lng: 10.1815 }; // Tunis, Tunisia
+            setUserLocation(defaultLoc);
+            localStorage.setItem("user_location", JSON.stringify(defaultLoc));
+            
+            if (user) {
+              try {
+                await upsertUserPreferences(user.id, { location: defaultLoc, timezone: detectedTz });
+              } catch (error) {
+                console.error('Error saving default location:', error);
+              }
+            }
+            
             if (detectedTz && detectedTz !== userTimezone) {
               setUserTimezone(detectedTz);
               localStorage.setItem("timezone", detectedTz);
@@ -649,12 +804,21 @@ const Quran = () => {
             enableHighAccuracy: true,
             timeout: 10000,
             maximumAge: 0 // Don't use cached location
-          }
-        );
-      } else {
+            }
+          );
+        } else {
         // Default to Tunisia if geolocation not available
         const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        setUserLocation({ lat: 36.8065, lng: 10.1815 }); // Tunis, Tunisia
+        const defaultLoc = { lat: 36.8065, lng: 10.1815 }; // Tunis, Tunisia
+        setUserLocation(defaultLoc);
+        localStorage.setItem("user_location", JSON.stringify(defaultLoc));
+        
+        if (user) {
+          upsertUserPreferences(user.id, { location: defaultLoc, timezone: detectedTz }).catch((error) => {
+            console.error('Error saving default location:', error);
+          });
+        }
+        
         if (detectedTz && detectedTz !== userTimezone) {
           setUserTimezone(detectedTz);
           localStorage.setItem("timezone", detectedTz);
@@ -663,7 +827,7 @@ const Quran = () => {
     };
 
     getLocation();
-  }, []);
+  }, [preferencesLoading, user, userTimezone]);
 
   // Fetch prayer times from Aladhan API
   useEffect(() => {
@@ -703,7 +867,7 @@ const Quran = () => {
         const currentHour = nowInApiTz.getHours();
         const currentMinute = nowInApiTz.getMinutes();
         const currentTimeMinutes = currentHour * 60 + currentMinute;
-        
+
         const processedPrayers = prayers.map((prayer, index) => {
           const [hours, minutes] = prayer.time.split(":").map(Number);
           const prayerTimeMinutes = hours * 60 + minutes;
@@ -958,7 +1122,7 @@ const Quran = () => {
                           second: "2-digit",
                           timeZone: userTimezone,
                           hour12: localStorage.getItem("timeFormat") === "12"
-                        })}
+                      })}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -1174,7 +1338,6 @@ const Quran = () => {
                         timeZone: userTimezone,
                         hour12: localStorage.getItem("timeFormat") === "12"
                       })}
-                      })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {userTimezone.replace(/_/g, " ")}
@@ -1274,9 +1437,9 @@ const Quran = () => {
             
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
-                <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
-                  <Bookmark className="w-4 h-4 ml-1" /> {isRTL ? "حفظ" : "Bookmark"}
-                </Button>
+              <Button variant="ghost" size="sm" onClick={saveBookmark} className="text-primary">
+                <Bookmark className="w-4 h-4 ml-1" /> {isRTL ? "حفظ" : "Bookmark"}
+              </Button>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">
                     {isRTL ? "صفحة" : "Page"} {currentPage} / 604
@@ -1287,7 +1450,7 @@ const Quran = () => {
               <div className="bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl p-6 min-h-[300px] flex flex-col items-center justify-center">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className="text-sm text-muted-foreground">{isRTL ? "جاري تحميل الآيات..." : "Loading verses..."}</p>
-              </div>
+            </div>
             ) : (
               <div className="bg-gradient-to-b from-sky-50/50 via-background to-sky-50/30 dark:from-sky-950/20 dark:via-background dark:to-sky-950/10 min-h-[500px] p-6" style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arial', serif", direction: "rtl", textAlign: "right" }}>
                 {currentVerses.verses.length > 0 ? (
@@ -1352,7 +1515,7 @@ const Quran = () => {
                                 ({verse.displayNumber})
                               </span>
                             </p>
-                          </div>
+            </div>
                         );
                       })})()}
                   </div>
@@ -1372,9 +1535,9 @@ const Quran = () => {
                 {isRTL ? "السابق" : "Previous"}
               </Button>
               <div className="flex flex-col items-center gap-1">
-                <span className="text-sm text-muted-foreground font-semibold">
-                  {currentPage} / 604
-                </span>
+              <span className="text-sm text-muted-foreground font-semibold">
+                {currentPage} / 604
+              </span>
                 {currentVerses.suraNumber && (
                   <span className="text-xs text-muted-foreground">
                     {isRTL ? "سورة" : "Sura"} {currentVerses.suraNumber}

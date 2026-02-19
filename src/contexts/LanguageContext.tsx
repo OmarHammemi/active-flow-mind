@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useAuth } from "./AuthContext";
+import { getUserPreferences, upsertUserPreferences } from "@/services/database";
 
 export type Language = "en" | "ar";
 
@@ -72,6 +74,7 @@ interface LanguageProviderProps {
 }
 
 export const LanguageProvider = ({ children }: LanguageProviderProps) => {
+  const { user } = useAuth();
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem("language") as Language;
     if (saved) return saved;
@@ -84,12 +87,48 @@ export const LanguageProvider = ({ children }: LanguageProviderProps) => {
     // Default to Arabic
     return "ar";
   });
+  const [languageLoading, setLanguageLoading] = useState(true);
 
-  const setLanguage = (lang: Language) => {
+  // Load language preference from database
+  useEffect(() => {
+    const loadLanguage = async () => {
+      if (!user) {
+        setLanguageLoading(false);
+        return;
+      }
+
+      try {
+        const prefs = await getUserPreferences(user.id);
+        if (prefs && prefs.language) {
+          setLanguageState(prefs.language);
+          localStorage.setItem("language", prefs.language);
+          document.documentElement.dir = prefs.language === "ar" ? "rtl" : "ltr";
+          document.documentElement.lang = prefs.language;
+        }
+      } catch (error) {
+        console.error('Error loading language preference:', error);
+      } finally {
+        setLanguageLoading(false);
+      }
+    };
+
+    loadLanguage();
+  }, [user]);
+
+  const setLanguage = async (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem("language", lang);
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = lang;
+
+    // Save to database if user is logged in
+    if (user && !languageLoading) {
+      try {
+        await upsertUserPreferences(user.id, { language: lang });
+      } catch (error) {
+        console.error('Error saving language preference:', error);
+      }
+    }
   };
 
   useEffect(() => {

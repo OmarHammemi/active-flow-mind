@@ -9,30 +9,86 @@ import { Flame, Star, BookOpen, Briefcase, Dumbbell, GraduationCap, Settings, Ch
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, AreaChart, Area } from "recharts";
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { format, subDays, startOfWeek, eachDayOfInterval } from "date-fns";
+import { getSectionTargets, upsertSectionTargets } from "@/services/database";
+import { format, subDays, startOfWeek, eachDayOfInterval, subWeeks, subMonths, startOfDay, endOfDay } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
-const dayNamesAr = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+const dayNamesAr = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"];
 
 const Index = () => {
   const navigate = useNavigate();
   const { tasks, loading, getTasksForDate } = useTasks();
   const { isRTL } = useLanguage();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [timePeriod, setTimePeriod] = useState<'week' | '2weeks' | 'month' | '3months' | '6months' | 'year'>('week');
   
-  // Target importance percentages for each section (stored in localStorage)
-  const [targetImportance, setTargetImportance] = useState<Record<string, number>>(() => {
+  // Target importance percentages for each section (stored in database)
+  const [targetImportance, setTargetImportance] = useState<Record<string, number>>({ quran: 40, work: 40, knowledge: 10, sport: 10 });
+  const [targetsLoading, setTargetsLoading] = useState(true);
+
+  // Load section targets from database
+  useEffect(() => {
+    const loadTargets = async () => {
+      if (!user) {
+        // Fallback to localStorage if not logged in
     const saved = localStorage.getItem('section_target_importance');
     if (saved) {
       try {
-        return JSON.parse(saved);
+            setTargetImportance(JSON.parse(saved));
       } catch {
-        return { quran: 40, work: 40, knowledge: 10, sport: 10 };
+            // Keep defaults
+          }
+        }
+        setTargetsLoading(false);
+        return;
       }
-    }
-    return { quran: 40, work: 40, knowledge: 10, sport: 10 };
-  });
+
+      try {
+        const targets = await getSectionTargets(user.id);
+        setTargetImportance(targets);
+        
+        // Migrate from localStorage if database is empty
+        const saved = localStorage.getItem('section_target_importance');
+        if (saved) {
+          try {
+            const localTargets = JSON.parse(saved);
+            const hasLocalData = Object.values(localTargets).some(v => v > 0);
+            const hasDbData = Object.values(targets).some(v => v > 0);
+            
+            if (hasLocalData && !hasDbData) {
+              // Migrate to database
+              await upsertSectionTargets(user.id, localTargets);
+              setTargetImportance(localTargets);
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      } catch (error) {
+        console.error('Error loading section targets:', error);
+        // Fallback to localStorage
+        const saved = localStorage.getItem('section_target_importance');
+        if (saved) {
+          try {
+            setTargetImportance(JSON.parse(saved));
+          } catch {
+            // Keep defaults
+          }
+        }
+      } finally {
+        setTargetsLoading(false);
+      }
+    };
+
+    loadTargets();
+  }, [user]);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [tempTargets, setTempTargets] = useState<Record<string, number>>(targetImportance);
@@ -44,10 +100,25 @@ const Index = () => {
     }
   }, [editDialogOpen, targetImportance]);
 
-  // Save target importance to localStorage
+  // Save target importance to database (and localStorage as backup)
   useEffect(() => {
+    if (!user || targetsLoading) return;
+    
+    const saveTargets = async () => {
+      // Save to database
+      const { error } = await upsertSectionTargets(user.id, targetImportance);
+      if (error) {
+        console.error('Error saving section targets to database:', error);
+        // Fallback to localStorage
+        localStorage.setItem('section_target_importance', JSON.stringify(targetImportance));
+      } else {
+        // Also save to localStorage as backup
     localStorage.setItem('section_target_importance', JSON.stringify(targetImportance));
-  }, [targetImportance]);
+      }
+    };
+
+    saveTargets();
+  }, [targetImportance, user, targetsLoading]);
 
   const handleSaveTargets = () => {
     const total = Object.values(tempTargets).reduce((sum, val) => sum + val, 0);
@@ -126,12 +197,56 @@ const Index = () => {
     return Math.round(weightedSum);
   }, [sections]);
 
-  // Generate weekly data from actual task completions
-  const weekData = useMemo(() => {
-    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 6 }); // Saturday
-    const weekDays = eachDayOfInterval({ start: weekStart, end: subDays(weekStart, -6) });
+  // Generate chart data based on selected time period
+  const chartData = useMemo(() => {
+    let startDate: Date;
+    let endDate = selectedDate;
+    let interval: 'day' | 'week' | 'month' = 'day';
     
-    return weekDays.map((date, index) => {
+    switch (timePeriod) {
+      case 'week':
+        // Week starts on Monday (1 = Monday in date-fns)
+        startDate = startOfWeek(endDate, { weekStartsOn: 1 });
+        interval = 'day';
+        break;
+      case '2weeks':
+        startDate = startOfWeek(subWeeks(endDate, 1), { weekStartsOn: 1 });
+        interval = 'day';
+        break;
+      case 'month':
+        startDate = subDays(endDate, 29);
+        interval = 'day';
+        break;
+      case '3months':
+        startDate = subMonths(endDate, 3);
+        interval = 'week';
+        break;
+      case '6months':
+        startDate = subMonths(endDate, 6);
+        interval = 'week';
+        break;
+      case 'year':
+        startDate = subMonths(endDate, 12);
+        interval = 'month';
+        break;
+      default:
+        startDate = subDays(endDate, 6);
+        interval = 'day';
+    }
+    
+    const dates = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    // For longer periods, sample data points
+    let sampledDates = dates;
+    if (interval === 'week' && dates.length > 20) {
+      // Sample weekly
+      sampledDates = dates.filter((_, i) => i % 7 === 0 || i === dates.length - 1);
+    } else if (interval === 'month' && dates.length > 30) {
+      // Sample monthly
+      sampledDates = dates.filter((_, i) => i % 30 === 0 || i === dates.length - 1);
+    }
+    
+    return sampledDates.map((date) => {
       const dateStr = date.toISOString().split('T')[0];
       const dayTasks = getTasksForDate(date);
       
@@ -143,15 +258,32 @@ const Index = () => {
         return totalImp > 0 ? Math.round((completedImp / totalImp) * 100) : 0;
       };
 
+      // Format date label based on interval
+      let dateLabel: string;
+      if (interval === 'day') {
+        // For daily view, show day name (Monday, Tuesday, etc.)
+        const dayIndex = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const dayNames = isRTL 
+          ? ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+          : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        dateLabel = dayNames[dayIndex];
+      } else if (interval === 'week') {
+        dateLabel = format(date, 'MMM dd');
+      } else {
+        dateLabel = format(date, 'MMM yyyy');
+      }
+
       return {
-        day: dayNamesAr[index],
+        date: dateLabel,
+        fullDate: dateStr,
+        day: format(date, 'd'),
         quran: getCategoryProgress('quran'),
         work: getCategoryProgress('work'),
         sport: getCategoryProgress('sport'),
         knowledge: getCategoryProgress('knowledge'),
       };
     });
-  }, [tasks, selectedDate, getTasksForDate]);
+  }, [tasks, selectedDate, timePeriod, getTasksForDate, isRTL]);
 
   // Calculate detailed analytics
   const detailedAnalytics = useMemo(() => {
@@ -169,12 +301,12 @@ const Index = () => {
       const completedImp = completed.reduce((sum, t) => sum + (t.importance || 0), 0);
       const progress = totalImp > 0 ? Math.round((completedImp / totalImp) * 100) : 0;
       
-      // Calculate average and high from week data
-      const weekValues = weekData.map(d => d[cat.dataKey as keyof typeof d] as number);
-      const avg = weekValues.length > 0 
-        ? Math.round(weekValues.reduce((a, b) => a + b, 0) / weekValues.length) 
+      // Calculate average and high from chart data
+      const chartValues = chartData.map(d => d[cat.dataKey as keyof typeof d] as number);
+      const avg = chartValues.length > 0 
+        ? Math.round(chartValues.reduce((a, b) => a + b, 0) / chartValues.length) 
         : 0;
-      const high = weekValues.length > 0 ? Math.max(...weekValues) : 0;
+      const high = chartValues.length > 0 ? Math.max(...chartValues) : 0;
 
       return {
         ...cat,
@@ -184,7 +316,7 @@ const Index = () => {
         importance: totalImp,
       };
     });
-  }, [todayTasks, todayStr, weekData]);
+  }, [todayTasks, todayStr, chartData]);
 
   // Calculate streak (simplified - consecutive days with any completion)
   const streak = useMemo(() => {
@@ -270,6 +402,46 @@ const Index = () => {
       {/* Journey Cards */}
       <div className="px-4 space-y-3">
         <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="text-xs">
+                  <CalendarIcon className="w-3 h-3 ml-1" />
+                  {format(selectedDate, "yyyy-MM-dd")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedDate(subDays(selectedDate, 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedDate(new Date())}
+              disabled={format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")}
+            >
+              {isRTL ? "اليوم" : "Today"}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedDate(subDays(selectedDate, -1))}
+              disabled={format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </div>
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="text-primary">
@@ -376,9 +548,24 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Weekly Chart */}
+      {/* Chart with Time Period Selector */}
       <div className="px-4 space-y-3">
-        <h3 className="text-lg font-bold text-right">التحليلات الأسبوعية</h3>
+        <div className="flex items-center justify-between">
+          <Select value={timePeriod} onValueChange={(v: any) => setTimePeriod(v)}>
+            <SelectTrigger className="w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">{isRTL ? "أسبوع" : "Week"}</SelectItem>
+              <SelectItem value="2weeks">{isRTL ? "أسبوعان" : "2 Weeks"}</SelectItem>
+              <SelectItem value="month">{isRTL ? "شهر" : "Month"}</SelectItem>
+              <SelectItem value="3months">{isRTL ? "3 أشهر" : "3 Months"}</SelectItem>
+              <SelectItem value="6months">{isRTL ? "6 أشهر" : "6 Months"}</SelectItem>
+              <SelectItem value="year">{isRTL ? "سنة" : "Year"}</SelectItem>
+            </SelectContent>
+          </Select>
+          <h3 className="text-lg font-bold text-right">التحليلات</h3>
+        </div>
         <div className="bg-card rounded-2xl p-4 border border-border">
           <div className="flex items-center justify-between mb-3">
             <div className="flex gap-3 text-[10px]">
@@ -390,8 +577,8 @@ const Index = () => {
             <h4 className="font-semibold text-sm">نظرة عامة</h4>
           </div>
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={weekData}>
-              <XAxis dataKey="day" tick={{ fill: "hsl(220,10%,55%)", fontSize: 10 }} axisLine={false} tickLine={false} />
+            <LineChart data={chartData}>
+              <XAxis dataKey="date" tick={{ fill: "hsl(220,10%,55%)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "hsl(220,10%,55%)", fontSize: 10 }} axisLine={false} tickLine={false} domain={[0, 100]} />
               <Tooltip contentStyle={{ background: "hsl(220,18%,14%)", border: "1px solid hsl(220,14%,22%)", borderRadius: "8px", fontSize: 12 }} />
               <Line type="monotone" dataKey="quran" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
@@ -430,7 +617,7 @@ const Index = () => {
                   <div className="text-right"><span className="font-semibold text-foreground">{cat.avg}%</span><br/>المتوسط</div>
                 </div>
                 <ResponsiveContainer width="100%" height={60}>
-                  <AreaChart data={weekData}>
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id={`grad-${cat.dataKey}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={cat.stroke} stopOpacity={0.4} />

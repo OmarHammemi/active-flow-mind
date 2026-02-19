@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, UserProfile } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { migrateLocalStorageToDatabase } from '@/services/migration';
 
 interface AuthContextType {
   user: User | null;
@@ -61,11 +62,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        await fetchProfile(session.user.id);
+        // Migrate localStorage data to database on login
+        await migrateLocalStorageToDatabase(session.user.id);
       }
       setLoading(false);
     });
@@ -73,11 +76,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        await fetchProfile(session.user.id);
+        // Migrate localStorage data to database on login
+        await migrateLocalStorageToDatabase(session.user.id);
       } else {
         setProfile(null);
       }

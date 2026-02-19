@@ -243,17 +243,17 @@ export default function EditTaskDialog({ task, trigger, selectedDate = new Date(
                 {importance[0]}%
               </span>
             </div>
-            <Slider
+              <Slider
               min={1}
-              max={maxImportance}
-              step={1}
-              value={importance}
+                max={maxImportance}
+                step={1}
+                value={importance}
               onValueChange={(newValue) => {
                 const clampedValue = Math.min(Math.max(1, newValue[0]), maxImportance);
                 setImportance([clampedValue]);
               }}
               className="w-full"
-            />
+              />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{isRTL ? "المتبقي:" : "Remaining:"} {remainingImportance + currentTaskImportance}%</span>
               <span>{isRTL ? "الإجمالي:" : "Total:"} {currentTotalImportance + importance[0]}%</span>

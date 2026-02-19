@@ -18,13 +18,69 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export interface UserProfile {
   id: string;
   email: string;
-  name: string;
-  age: number | null;
-  location: string;
-  photo_url: string | null;
-  target_1: string;
-  target_2: string;
-  target_3: string;
+}
+
+// Database Types
+export interface UserPreferences {
+  id: string;
+  user_id: string;
+  timezone: string;
+  time_format: '12' | '24';
+  language: 'ar' | 'en';
+  location: { lat: number; lng: number } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SectionTarget {
+  id: string;
+  user_id: string;
+  category: 'quran' | 'work' | 'sport' | 'knowledge';
+  target_percentage: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeightEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  weight: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Book {
+  id: string;
+  user_id: string;
+  title: string;
+  author: string | null;
+  current_page: number;
+  total_pages: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuranData {
+  id: string;
+  user_id: string;
+  last_page: number;
+  bookmark: { page: number; sura: number; verse: number } | null;
+  adhkar_completed: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgressHistory {
+  id: string;
+  user_id: string;
+  date: string;
+  category: 'quran' | 'work' | 'sport' | 'knowledge';
+  progress_percentage: number;
+  tasks_completed: number;
+  tasks_total: number;
+  importance_used: number;
   created_at: string;
   updated_at: string;
 }

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { User, MapPin, Camera, Target, Edit, Save, X, Mail, Calendar, LogOut, Globe, Languages, Moon, Clock, Bell, Heart, BellRing, Volume2, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getUserPreferences, upsertUserPreferences } from "@/services/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,16 +50,73 @@ const Profile = () => {
     const saved = localStorage.getItem("timeFormat");
     return saved || "24";
   });
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
 
-  // Update timezone in localStorage
+  // Load user preferences from database
   useEffect(() => {
-    localStorage.setItem("timezone", timezone);
-  }, [timezone]);
+    const loadPreferences = async () => {
+      if (!user) {
+        setPreferencesLoading(false);
+        return;
+      }
 
-  // Update time format in localStorage
+      try {
+        const prefs = await getUserPreferences(user.id);
+        if (prefs) {
+          if (prefs.timezone) {
+            setTimezone(prefs.timezone);
+            localStorage.setItem("timezone", prefs.timezone);
+          }
+          if (prefs.time_format) {
+            setTimeFormat(prefs.time_format);
+            localStorage.setItem("timeFormat", prefs.time_format);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      } finally {
+        setPreferencesLoading(false);
+      }
+    };
+
+    loadPreferences();
+  }, [user]);
+
+  // Update timezone in database and localStorage
   useEffect(() => {
-    localStorage.setItem("timeFormat", timeFormat);
-  }, [timeFormat]);
+    if (!user || preferencesLoading) {
+      localStorage.setItem("timezone", timezone);
+      return;
+    }
+
+    const saveTimezone = async () => {
+      const { error } = await upsertUserPreferences(user.id, { timezone });
+      if (error) {
+        console.error('Error saving timezone:', error);
+      }
+      localStorage.setItem("timezone", timezone);
+    };
+
+    saveTimezone();
+  }, [timezone, user, preferencesLoading]);
+
+  // Update time format in database and localStorage
+  useEffect(() => {
+    if (!user || preferencesLoading) {
+      localStorage.setItem("timeFormat", timeFormat);
+      return;
+    }
+
+    const saveTimeFormat = async () => {
+      const { error } = await upsertUserPreferences(user.id, { time_format: timeFormat as '12' | '24' });
+      if (error) {
+        console.error('Error saving time format:', error);
+      }
+      localStorage.setItem("timeFormat", timeFormat);
+    };
+
+    saveTimeFormat();
+  }, [timeFormat, user, preferencesLoading]);
 
   // Language options
   const languages = [

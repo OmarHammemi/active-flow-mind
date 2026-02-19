@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { TaskProvider } from "./contexts/TaskContext";
 import AppHeader from "./components/AppHeader";
 import BottomNav from "./components/BottomNav";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Quran from "./pages/Quran";
@@ -36,14 +38,34 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
 const queryClient = new QueryClient();
 
+// HTTPS Enforcement Component
+const HTTPSEnforcer = () => {
+  useEffect(() => {
+    // Only enforce HTTPS in production (not localhost)
+    if (
+      window.location.protocol !== 'https:' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1' &&
+      !window.location.hostname.startsWith('192.168.') &&
+      !window.location.hostname.startsWith('10.')
+    ) {
+      window.location.replace(
+        'https:' + window.location.href.substring(window.location.protocol.length)
+      );
+    }
+  }, []);
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <AuthProvider>
+    <HTTPSEnforcer />
+    <AuthProvider>
+      <LanguageProvider>
         <TaskProvider>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
             <BrowserRouter
               future={{
                 v7_startTransition: true,
@@ -57,62 +79,74 @@ const App = () => (
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 
-                {/* App routes - with header/nav */}
+                {/* App routes - with header/nav - PROTECTED */}
                 <Route
                   path="/dashboard"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Index />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/quran"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Quran />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/work"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Work />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/sport"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Sport />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/knowledge"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Knowledge />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route
                   path="/profile"
                   element={
-                    <AppLayout>
+                    <ProtectedRoute>
+                      <AppLayout>
                         <Profile />
-                    </AppLayout>
+                      </AppLayout>
+                    </ProtectedRoute>
                   }
                 />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+            </BrowserRouter>
+          </TooltipProvider>
         </TaskProvider>
-      </AuthProvider>
-    </LanguageProvider>
+      </LanguageProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

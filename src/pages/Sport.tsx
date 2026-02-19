@@ -9,10 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts";
 import { useTasks } from "@/contexts/TaskContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
 import EditTaskDialog from "@/components/EditTaskDialog";
 import { format } from "date-fns";
 import { Task } from "@/lib/supabase";
+import { getWeightEntries, addWeightEntry, deleteWeightEntry } from "@/services/database";
 
 interface WeightEntry {
   date: string;
@@ -22,6 +24,7 @@ interface WeightEntry {
 const Sport = () => {
   const { tasks, loading, deleteTask, completeTask, uncompleteTask, getTasksForDate } = useTasks();
   const { isRTL } = useLanguage();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -31,17 +34,8 @@ const Sport = () => {
   const [meals, setMeals] = useState<{ name: string; calories: number }[]>([]);
 
   // Weight tracking state
-  const [weightEntries, setWeightEntries] = useState<WeightEntry[]>(() => {
-    const saved = localStorage.getItem('weight_entries');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
+  const [weightEntriesLoading, setWeightEntriesLoading] = useState(true);
   const [newWeight, setNewWeight] = useState("");
   const [weightPeriod, setWeightPeriod] = useState<'week' | '2weeks' | 'month' | '3months' | '6months' | 'year'>('month');
 
@@ -59,10 +53,65 @@ const Sport = () => {
     pause: 2,
   };
 
-  // Save weight entries to localStorage
+  // Load weight entries from database
   useEffect(() => {
-    localStorage.setItem('weight_entries', JSON.stringify(weightEntries));
-  }, [weightEntries]);
+    const loadWeightEntries = async () => {
+      if (!user) {
+        // Fallback to localStorage if not logged in
+        const saved = localStorage.getItem('weight_entries');
+        if (saved) {
+          try {
+            setWeightEntries(JSON.parse(saved));
+          } catch {
+            setWeightEntries([]);
+          }
+        }
+        setWeightEntriesLoading(false);
+        return;
+      }
+
+      try {
+        const entries = await getWeightEntries(user.id);
+        setWeightEntries(entries);
+        
+        // Migrate from localStorage if database is empty
+        if (entries.length === 0) {
+          const saved = localStorage.getItem('weight_entries');
+          if (saved) {
+            try {
+              const localEntries = JSON.parse(saved);
+              if (localEntries.length > 0) {
+                // Migrate to database
+                for (const entry of localEntries) {
+                  await addWeightEntry(user.id, entry.date, entry.weight, entry.notes || undefined);
+                }
+                // Reload from database
+                const migrated = await getWeightEntries(user.id);
+                setWeightEntries(migrated);
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading weight entries:', error);
+        // Fallback to localStorage
+        const saved = localStorage.getItem('weight_entries');
+        if (saved) {
+          try {
+            setWeightEntries(JSON.parse(saved));
+          } catch {
+            setWeightEntries([]);
+          }
+        }
+      } finally {
+        setWeightEntriesLoading(false);
+      }
+    };
+
+    loadWeightEntries();
+  }, [user]);
 
   // Breathing exercise timer
   useEffect(() => {
@@ -213,7 +262,7 @@ const Sport = () => {
     setMealCalories("");
   };
 
-  const addWeight = () => {
+  const addWeight = async () => {
     if (!newWeight || isNaN(parseFloat(newWeight))) {
       toast({
         title: isRTL ? "خطأ" : "Error",
@@ -226,18 +275,36 @@ const Sport = () => {
     const dateStr = today.toISOString().split('T')[0]; // Use ISO format for proper sorting
     const weightValue = parseFloat(newWeight);
     
-    // Check if entry for today already exists
+    if (!user) {
+      // Fallback to localStorage if not logged in
     const existingIndex = weightEntries.findIndex(entry => entry.date === dateStr || entry.date.startsWith(dateStr.split('T')[0]));
-    
-    if (existingIndex >= 0) {
-      // Update existing entry
-      const updated = [...weightEntries];
-      updated[existingIndex] = { date: dateStr, weight: weightValue };
+      const updated = existingIndex >= 0
+        ? weightEntries.map((e, i) => i === existingIndex ? { date: dateStr, weight: weightValue } : e)
+        : [...weightEntries, { date: dateStr, weight: weightValue }];
       setWeightEntries(updated);
-    } else {
-      // Add new entry
-      setWeightEntries([...weightEntries, { date: dateStr, weight: weightValue }]);
+      localStorage.setItem('weight_entries', JSON.stringify(updated));
+      setNewWeight("");
+      toast({
+        title: isRTL ? "نجح" : "Success",
+        description: isRTL ? "تم تسجيل الوزن بنجاح" : "Weight recorded successfully",
+      });
+      return;
     }
+
+    // Save to database (upsert handles both insert and update)
+    const { error } = await addWeightEntry(user.id, dateStr, weightValue);
+    if (error) {
+      toast({
+        title: isRTL ? "خطأ" : "Error",
+        description: isRTL ? "فشل في حفظ الوزن" : "Failed to save weight",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Reload from database
+    const entries = await getWeightEntries(user.id);
+    setWeightEntries(entries);
     
     setNewWeight("");
     toast({
