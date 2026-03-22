@@ -87,7 +87,8 @@ export const LanguageProvider = ({ children }: LanguageProviderProps) => {
     // Default to Arabic
     return "ar";
   });
-  const [languageLoading, setLanguageLoading] = useState(true);
+  // Start with loading = false so app renders immediately
+  const [languageLoading, setLanguageLoading] = useState(false);
 
   // Load language preference from database
   useEffect(() => {

@@ -170,7 +170,7 @@ const Knowledge = () => {
     if (!user) {
       // Fallback to localStorage if not logged in
       const newBook: BookType = {
-        id: Date.now().toString(),
+      id: Date.now().toString(),
         user_id: '',
         title: newBookTitle.trim(),
         author: newBookAuthor.trim() || null,
@@ -210,9 +210,9 @@ const Knowledge = () => {
       // Reload books from database to ensure consistency
       const reloadedBooks = await getBooks(user.id);
       setBooks(reloadedBooks);
-      setNewBookTitle("");
-      setNewBookAuthor("");
-      setNewBookPages("");
+    setNewBookTitle("");
+    setNewBookAuthor("");
+    setNewBookPages("");
     }
   };
 

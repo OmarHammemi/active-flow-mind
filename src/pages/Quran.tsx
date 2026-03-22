@@ -423,7 +423,7 @@ const Quran = () => {
     
     if (!user) {
       // Fallback to localStorage if not logged in
-      localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
+    localStorage.setItem("quran_bookmark", JSON.stringify(bookmark));
       setLastRead(bookmark);
       return;
     }
@@ -1082,7 +1082,8 @@ const Quran = () => {
               size="sm"
               onClick={() => {
                 localStorage.removeItem("user_location");
-                window.location.reload();
+                // Use React Router navigate instead of reload to prevent infinite loops
+                window.location.href = window.location.href.split('#')[0];
               }}
               className="text-xs text-muted-foreground"
             >

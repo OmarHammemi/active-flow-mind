@@ -10,21 +10,30 @@ import type {
 
 // ==================== User Preferences ====================
 export const getUserPreferences = async (userId: string): Promise<UserPreferences | null> => {
-  const { data, error } = await supabase
-    .from('user_preferences')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // No preferences found, return null
+    if (error) {
+      // Handle 406 Not Acceptable (table doesn't exist or RLS blocking)
+      if (error.code === 'PGRST116' || error.status === 406 || error.status === 404) {
+        // No preferences found or table doesn't exist, return null
+        return null;
+      }
+      // Only log non-expected errors
+      if (error.status !== 406 && error.status !== 404) {
+        console.error('Error fetching user preferences:', error);
+      }
       return null;
     }
-    console.error('Error fetching user preferences:', error);
+    return data;
+  } catch (error) {
+    // Silently handle errors - app should work without database
     return null;
   }
-  return data;
 };
 
 export const upsertUserPreferences = async (userId: string, preferences: Partial<UserPreferences>): Promise<{ error: Error | null }> => {

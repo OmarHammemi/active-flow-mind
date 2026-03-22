@@ -14,18 +14,27 @@ import {
 /**
  * Migrates all localStorage data to database for a user
  * This should be called once when user logs in
+ * Has a timeout to prevent hanging
  */
 export const migrateLocalStorageToDatabase = async (userId: string): Promise<void> => {
-  try {
-    // Check if user already has database records (already migrated)
-    const existingPrefs = await getUserPreferences(userId);
-    if (existingPrefs) {
-      // User already has data, but we should still sync localStorage as backup
-      console.log('User already has database records, syncing localStorage as backup');
-      return;
-    }
+  // Add timeout to prevent hanging (30 seconds max)
+  const timeoutPromise = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error('Migration timeout')), 30000);
+  });
 
-    console.log('Starting migration from localStorage to database...');
+  try {
+    // Race between migration and timeout
+    await Promise.race([
+      (async () => {
+        // Check if user already has database records (already migrated)
+        const existingPrefs = await getUserPreferences(userId);
+        if (existingPrefs) {
+          // User already has data, but we should still sync localStorage as backup
+          console.log('User already has database records, syncing localStorage as backup');
+          return;
+        }
+
+        console.log('Starting migration from localStorage to database...');
 
     // 1. Migrate User Preferences (timezone, timeFormat, language, location)
     const timezone = localStorage.getItem('timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -136,7 +145,10 @@ export const migrateLocalStorageToDatabase = async (userId: string): Promise<voi
       adhkar_completed: adhkarCompleted,
     });
 
-    console.log('Migration completed successfully!');
+        console.log('Migration completed successfully!');
+      })(),
+      timeoutPromise
+    ]);
   } catch (error) {
     console.error('Error during migration:', error);
     // Don't throw - migration failure shouldn't break the app

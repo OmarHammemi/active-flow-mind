@@ -33,7 +33,8 @@ interface TaskProviderProps {
 export const TaskProvider = ({ children }: TaskProviderProps) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Start with loading = false so app renders immediately
+  const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<TasksMode>(() => {
     // If Supabase isn't configured, default to local mode to avoid noisy network errors.
     const hasSupabaseKey = Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY);

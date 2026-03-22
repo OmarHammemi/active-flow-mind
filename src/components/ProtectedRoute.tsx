@@ -11,11 +11,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only redirect if loading is complete AND no user
+    // This ensures we wait for AuthContext to finish loading the session
     if (!loading && !user) {
       navigate("/", { replace: true });
     }
   }, [user, loading, navigate]);
 
+  // Show loading while AuthContext is checking for session
   if (loading) {
     return (
       <div className="min-h-screen w-full bg-background flex items-center justify-center">
@@ -27,6 +30,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
+  // If no user after loading completes, will redirect via useEffect
   if (!user) {
     return null;
   }

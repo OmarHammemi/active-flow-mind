@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { TaskProvider } from "./contexts/TaskContext";
@@ -22,6 +22,28 @@ import SignUp from "./pages/SignUp";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
+// Global OAuth callback handler - redirects to /auth/callback if access_token is in hash
+const OAuthHandler = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Check if there's an access_token in the URL hash (OAuth callback)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    
+    // If we have an access_token but we're NOT on /auth/callback, redirect there
+    // IMPORTANT: Use window.location to preserve hash (React Router navigate doesn't handle hash well)
+    // Only redirect if we're not already on the callback page and we have a token
+    if (accessToken && location.pathname !== '/auth/callback') {
+      // Use window.location to preserve hash - this will cause a full page reload
+      // but it's necessary to ensure Supabase can process the OAuth callback
+      window.location.href = '/auth/callback' + window.location.hash;
+    }
+  }, [location.pathname]); // Only re-run if pathname changes
+  
+  return null;
+};
+
 // Layout wrapper that forces remount on route change
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -38,40 +60,24 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
 const queryClient = new QueryClient();
 
-// HTTPS Enforcement Component
-const HTTPSEnforcer = () => {
-  useEffect(() => {
-    // Only enforce HTTPS in production (not localhost)
-    if (
-      window.location.protocol !== 'https:' &&
-      window.location.hostname !== 'localhost' &&
-      window.location.hostname !== '127.0.0.1' &&
-      !window.location.hostname.startsWith('192.168.') &&
-      !window.location.hostname.startsWith('10.')
-    ) {
-      window.location.replace(
-        'https:' + window.location.href.substring(window.location.protocol.length)
-      );
-    }
-  }, []);
-  return null;
-};
+// HTTPS Enforcement Component - REMOVED to prevent redirect loops
+// Nginx should handle HTTPS redirects at the server level
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <HTTPSEnforcer />
     <AuthProvider>
-      <LanguageProvider>
+    <LanguageProvider>
         <TaskProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
             <BrowserRouter
               future={{
                 v7_startTransition: true,
                 v7_relativeSplatPath: true,
               }}
             >
+              <OAuthHandler />
               <Routes>
                 {/* Public routes - no header/nav */}
                 <Route path="/" element={<Landing />} />
@@ -142,11 +148,11 @@ const App = () => (
                 />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
+      </BrowserRouter>
+    </TooltipProvider>
         </TaskProvider>
       </LanguageProvider>
-    </AuthProvider>
+      </AuthProvider>
   </QueryClientProvider>
 );
 

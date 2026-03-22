@@ -12,6 +12,22 @@ const Landing = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  // Check for OAuth callback in hash and redirect to /auth/callback
+  // Only run once on mount to prevent redirect loops
+  useEffect(() => {
+    // Only check if we have a hash
+    if (!window.location.hash) return;
+    
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    
+    // If we have an access_token in the hash, redirect to /auth/callback
+    // Use window.location to preserve hash (React Router navigate doesn't handle hash well)
+    if (accessToken) {
+      window.location.href = '/auth/callback' + window.location.hash;
+    }
+  }, []); // Empty deps - only run once on mount
+
   // Don't redirect - always show landing page
   // Users can navigate to dashboard manually if logged in
 
@@ -132,17 +148,8 @@ const Landing = () => {
 
   const currentContent = content[isRTL ? "ar" : "en"];
 
-  // Show loading state while checking auth
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
-        </div>
-      </div>
-    );
-  }
+  // Don't show loading on landing page - always show content immediately
+  // Auth check happens in background and doesn't block rendering
 
   return (
     <div className="min-h-screen bg-background" dir={isRTL ? "rtl" : "ltr"}>

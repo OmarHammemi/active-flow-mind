@@ -174,7 +174,7 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  }, [state]);
+  }, []); // Empty deps - only run once on mount
 
   return {
     ...state,

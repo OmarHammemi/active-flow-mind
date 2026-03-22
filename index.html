@@ -6,13 +6,20 @@
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-    <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains" />
+    <!-- Security Headers (only ones that work in meta tags) -->
+    <!-- Only upgrade to HTTPS when accessing via proper domain (not dev server) -->
+    <script>
+      // Only apply upgrade-insecure-requests when on production domain
+      if (window.location.hostname === 'falah.live' || window.location.hostname === 'www.falah.live') {
+        const meta = document.createElement('meta');
+        meta.httpEquiv = 'Content-Security-Policy';
+        meta.content = 'upgrade-insecure-requests';
+        document.head.appendChild(meta);
+      }
+    </script>
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <!-- Note: X-Frame-Options and Strict-Transport-Security must be set via HTTP headers in Nginx/Apache config -->
     
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -24,9 +31,10 @@
     <meta name="twitter:image" content="/logo.svg" />
     <title>فلاح - متتبع الأهداف</title>
     <script>
-      // Force HTTPS redirect (only in production)
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        location.replace('https:' + window.location.href.substring(window.location.protocol.length));
+      // DISABLE VITE HMR CLIENT - PREVENT WEBSOCKET CONNECTIONS
+      window.__VITE_IS_MODERN_BROWSER__ = false;
+      if (window.importHot) {
+        window.importHot = undefined;
       }
       
       // Force cache refresh
@@ -44,10 +52,64 @@
           }
         });
       }
+      
+      // IMMEDIATE REDIRECT FIX for /auth/callback with empty hash
+      // This runs BEFORE React loads, so it catches cases where React doesn't initialize
+      (function() {
+        if (window.location.pathname === '/auth/callback') {
+          const hash = window.location.hash;
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const hasAccessToken = hashParams.has('access_token');
+          
+          // If we HAVE access_token, let React handle it (don't redirect)
+          // React will process the OAuth callback properly
+          if (hasAccessToken) {
+            console.log('[Pre-React] Found access_token in hash, letting React handle OAuth callback');
+            return; // Don't redirect - let React process it
+          }
+          
+          // If no access_token in hash, check for existing session
+          // Wait a bit for Supabase to potentially process any tokens
+          setTimeout(function() {
+            console.log('[Pre-React] No access_token in hash, checking for existing session...');
+            // Check localStorage for existing session
+            try {
+              const storageKey = 'sb-jihbvsjgxzovyskmgfgr-auth-token';
+              const stored = localStorage.getItem(storageKey);
+              if (stored) {
+                try {
+                  const parsed = JSON.parse(stored);
+                  if (parsed && parsed.currentSession && parsed.currentSession.user) {
+                    console.log('[Pre-React] Found existing session, redirecting to profile');
+                    window.location.replace(window.location.origin + '/profile');
+                    return;
+                  }
+                } catch (e) {
+                  // Invalid JSON, continue to home
+                }
+              }
+            } catch (e) {
+              // localStorage error, continue to home
+            }
+            // No session found, go to home
+            console.log('[Pre-React] No session found, redirecting to home');
+            window.location.replace(window.location.origin + '/');
+          }, 2000); // Wait 2 seconds for Supabase to process
+        }
+      })();
     </script>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Block Vite client before it loads
+      if (typeof window !== 'undefined') {
+        Object.defineProperty(window, 'import', {
+          value: undefined,
+          writable: false,
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -94,7 +94,7 @@ const Profile = () => {
       if (error) {
         console.error('Error saving timezone:', error);
       }
-      localStorage.setItem("timezone", timezone);
+    localStorage.setItem("timezone", timezone);
     };
 
     saveTimezone();
@@ -112,7 +112,7 @@ const Profile = () => {
       if (error) {
         console.error('Error saving time format:', error);
       }
-      localStorage.setItem("timeFormat", timeFormat);
+    localStorage.setItem("timeFormat", timeFormat);
     };
 
     saveTimeFormat();
